@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Three.js - Template - Complex</title>
+  <script type="module" crossorigin src="/portal/assets/index-KJh7rexd.js"></script>
+  <link rel="stylesheet" crossorigin href="/portal/assets/index-BF9w5cS6.css">
+</head>
+
+<body>
+    <div class="dot"></div>
+    <div class="analog"></div>
+    <canvas class="webgl"></canvas>
+    <script id="vertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    </script>
+    <script id="fragmentShaderBlue" type="x-shader/x-fragment">
+        uniform vec2 iResolution;
+        uniform float iTime;
+        varying vec2 vUv;
+    
+        float snoise(vec3 uv, float res) {
+            const vec3 s = vec3(1e0, 1e2, 1e3);
+            
+            uv *= res;
+            
+            vec3 uv0 = floor(mod(uv, res)) * s;
+            vec3 uv1 = floor(mod(uv + vec3(1.0), res)) * s;
+            
+            vec3 f = fract(uv);
+            f = f * f * (3.0 - 2.0 * f);
+    
+            vec4 v = vec4(uv0.x + uv0.y + uv0.z, uv1.x + uv0.y + uv0.z,
+                        uv0.x + uv1.y + uv0.z, uv1.x + uv1.y + uv0.z);
+    
+            vec4 r = fract(sin(v * 1e-1) * 1e3);
+            float r0 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            
+            r = fract(sin((v + uv1.z - uv0.z) * 1e-1) * 1e3);
+            float r1 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            
+            return mix(r0, r1, f.z) * 2.0 - 1.0;
+        }
+    
+        void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+            vec2 p = -0.5 + fragCoord.xy / iResolution.xy;
+            p.x *= (iResolution.x * 1.5) / iResolution.x;
+    
+            float color = 3.0 - (3.0 * length(2.0 * p));
+            
+            vec3 coord = vec3(atan(p.x, p.y) / 6.2832 + 0.5, length(p) * 0.4, 0.5);
+            
+            coord = 1.0 - coord;
+            
+            for (int i = 1; i <= 1; i++) {
+                float power = pow(2.0, float(i));
+                color += (0.4 / power) * snoise(coord + vec3(0.0, -iTime * 0.05, iTime * 0.01), power * 16.0);
+            }
+            color = 1.0 - color;
+            color *= 2.7;
+            
+            color *= smoothstep(0.43, 0.4, length(p));
+    
+            if (color < 0.6) discard; // Discard fragments that are too dark
+    
+            fragColor = vec4(pow(max(color, 0.0), 3.0) * 0.15, pow(max(color, 0.0), 2.0) * 0.4, color, color > 0.1 ? 1.0 : 0.0);
+        }
+    
+        void main() {
+            mainImage(gl_FragColor, vUv * iResolution.xy);
+        }
+    </script>    
+    <script id="fragmentShaderOrange" type="x-shader/x-fragment">
+        uniform vec2 iResolution;
+        uniform float iTime;
+        varying vec2 vUv;
+    
+        float snoise(vec3 uv, float res) {
+            const vec3 s = vec3(1e0, 1e2, 1e3);
+            
+            uv *= res;
+            
+            vec3 uv0 = floor(mod(uv, res)) * s;
+            vec3 uv1 = floor(mod(uv + vec3(1.0), res)) * s;
+            
+            vec3 f = fract(uv);
+            f = f * f * (3.0 - 2.0 * f);
+    
+            vec4 v = vec4(uv0.x + uv0.y + uv0.z, uv1.x + uv0.y + uv0.z,
+                        uv0.x + uv1.y + uv0.z, uv1.x + uv1.y + uv0.z);
+    
+            vec4 r = fract(sin(v * 1e-1) * 1e3);
+            float r0 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            
+            r = fract(sin((v + uv1.z - uv0.z) * 1e-1) * 1e3);
+            float r1 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            
+            return mix(r0, r1, f.z) * 2.0 - 1.0;
+        }
+    
+        void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+            vec2 p = -0.5 + fragCoord.xy / iResolution.xy;
+            p.x *= (iResolution.x * 1.5) / iResolution.x;
+    
+            float color = 3.0 - (3.0 * length(2.0 * p));
+            
+            vec3 coord = vec3(atan(p.x, p.y) / 6.2832 + 0.5, length(p) * 0.4, 0.5);
+            
+            coord = 1.0 - coord;
+            
+            for (int i = 1; i <= 1; i++) {
+                float power = pow(2.0, float(i));
+                color += (0.4 / power) * snoise(coord + vec3(0.0, -iTime * 0.05, iTime * 0.01), power * 16.0);
+            }
+            color = 1.0 - color;
+            color *= 2.7;
+            
+            color *= smoothstep(0.43, 0.4, length(p));
+    
+            if (color < 0.6) discard; // Discard fragments that are too dark
+    
+            fragColor = vec4(color, pow(max(color, 0.0), 2.0) * 0.4, pow(max(color, 0.0), 3.0) * 0.15, color > 0.1 ? 1.0 : 0.0);
+        }
+    
+        void main() {
+            mainImage(gl_FragColor, vUv * iResolution.xy);
+        }
+    </script>
+</body>
+
+</html>

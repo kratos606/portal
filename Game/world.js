@@ -175,7 +175,7 @@ export default class World {
         this.rightPortal = []
         this.portalPhysics = false
         this.collisionDetected = false;
-        this.virtualCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        this.virtualCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.scene.add(this.virtualCamera);
         this.collisionDetected = false
         this.portalHandler = new Portal(this.scene, this.game.renderer.instance);
@@ -383,135 +383,88 @@ export default class World {
         );
       }
 
-    setWorld() {
-        const wallShape = new CANNON.Box(new CANNON.Vec3(60, 30, 1))
+      setWorld() {
+        // Adjusting the floor
+        const floorShape = new CANNON.Plane();
+        const floorBody = new CANNON.Body();
+        floorBody.mass = 0;
+        floorBody.addShape(floorShape);
+        floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5);
+        this.physics.addBody(floorBody);
+    
         this.plane = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 60),
+            new THREE.PlaneGeometry(200, 200),
             new THREE.MeshStandardMaterial({
                 roughness: 0.2,
                 metalness: 0.1
             })
-        )
-        this.plane.rotation.x = -Math.PI / 2
-        this.plane.receiveShadow = true
-        this.scene.add(this.plane)
-
-        const floorShape = new CANNON.Plane()
-        const floorBody = new CANNON.Body()
-        floorBody.mass = 0
-        floorBody.addShape(floorShape)
-        floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(- 1, 0, 0), Math.PI * 0.5)
-        this.physics.addBody(floorBody)
-
-        this.plane.physicObject = floorBody
-
-        let backWallMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 30),
-            new THREE.MeshStandardMaterial({
-                color: 0xf0ffff,
-                side: THREE.DoubleSide
-            })
-        )
-        backWallMesh.position.z = 30
-        backWallMesh.position.y = 15
-        backWallMesh.rotation.y = Math.PI
-        this.scene.add(backWallMesh)
-
-        const backWallBody = new CANNON.Body()
-        backWallBody.mass = 0
-        backWallBody.material = this.defaultMaterial
-        backWallBody.addShape(wallShape)
-        backWallBody.quaternion.copy(backWallMesh.quaternion)
-        backWallBody.position.copy(backWallMesh.position)
-        this.physics.addBody(backWallBody)
-
-        backWallMesh.physicObject = backWallBody
-
-        const frontWallBody = new CANNON.Body()
-        frontWallBody.mass = 0
-        frontWallBody.addShape(wallShape)
-        frontWallBody.quaternion.copy(backWallMesh.quaternion)
-        frontWallBody.position.set(0, 15, -30)
-        this.physics.addBody(frontWallBody)
-
-        let frontWallMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 30),
-            new THREE.MeshStandardMaterial({
-                color: 0xff0fff,
-                side: THREE.DoubleSide
-            })
-        )
-        frontWallMesh.position.z = -30
-        frontWallMesh.position.y = 15
-        frontWallMesh.physicObject = frontWallBody
-        this.scene.add(frontWallMesh)
-
-        let leftWallMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 30),
-            new THREE.MeshStandardMaterial({
-                color: 0xfff0ff,
-                side: THREE.DoubleSide
-            })
-        )
-        leftWallMesh.rotation.y = Math.PI / 2
-        leftWallMesh.position.x = -30
-        leftWallMesh.position.y = 15
-        this.scene.add(leftWallMesh)
-
-        const leftWallBody = new CANNON.Body()
-        leftWallBody.mass = 0
-        leftWallBody.addShape(wallShape)
-        leftWallBody.quaternion.copy(leftWallMesh.quaternion)
-        leftWallBody.position.copy(leftWallMesh.position)
-        this.physics.addBody(leftWallBody)
-
-        leftWallMesh.physicObject = leftWallBody
-
-
-        let rightWallMesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 30),
-            new THREE.MeshStandardMaterial({
-                color: 0xffff0f,
-                side: THREE.DoubleSide
-            })
-        )
-        rightWallMesh.rotation.y = -Math.PI / 2
-        rightWallMesh.position.x = 30
-        rightWallMesh.position.y = 15
-        this.scene.add(rightWallMesh)
-
-        const rightWallBody = new CANNON.Body()
-        rightWallBody.mass = 0
-        rightWallBody.addShape(wallShape)
-        rightWallBody.quaternion.copy(rightWallMesh.quaternion)
-        rightWallBody.position.copy(rightWallMesh.position)
-        this.physics.addBody(rightWallBody)
-
-        rightWallMesh.physicObject = rightWallBody
-
-        this.roof = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 60),
-            new THREE.MeshStandardMaterial()
-        )
-        this.roof.rotation.x = Math.PI / 2
-        this.roof.position.y = 30
-        this.scene.add(this.roof)
-
-        const roofShape = new CANNON.Plane()
-        const roofBody = new CANNON.Body()
-        roofBody.mass = 0
-        roofBody.addShape(roofShape)
-        roofBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI * 0.5)
-        roofBody.position.y = 30
-        this.physics.addBody(roofBody)
-
-        this.roof.physicObject = roofBody
-
+        );
+        this.plane.rotation.x = -Math.PI / 2;
+        this.plane.receiveShadow = true;
+        this.plane.position.set(0, 0, 0);
+        this.scene.add(this.plane);
+        this.plane.physicObject = floorBody;
+    
+        // Adjusting the walls
+        const wallShape = new CANNON.Box(new CANNON.Vec3(100, 50, 1));
+    
+        const createWall = (width, height, depth, color, position, rotation) => {
+            const wallMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(width, height),
+                new THREE.MeshStandardMaterial({
+                    color: color,
+                    side: THREE.DoubleSide
+                })
+            );
+            wallMesh.position.set(position.x, position.y, position.z);
+            wallMesh.rotation.set(rotation.x, rotation.y, rotation.z);
+            this.scene.add(wallMesh);
+    
+            const wallBody = new CANNON.Body();
+            wallBody.mass = 0;
+            wallBody.addShape(wallShape);
+            wallBody.position.copy(wallMesh.position);
+            wallBody.quaternion.copy(wallMesh.quaternion);
+            this.physics.addBody(wallBody);
+    
+            wallMesh.physicObject = wallBody;
+            return wallMesh;
+        };
+    
+        const wallHeight = 100;
+        const wallYPosition = wallHeight / 2;
+    
+        let backWallMesh = createWall(200, wallHeight, 1, 0xf0ffff, { x: 0, y: wallYPosition, z: 100 }, { x: 0, y: Math.PI, z: 0 });
         backWallMesh.name = 'backWall';
+    
+        let frontWallMesh = createWall(200, wallHeight, 1, 0xff0fff, { x: 0, y: wallYPosition, z: -100 }, { x: 0, y: 0, z: 0 });
         frontWallMesh.name = 'frontWall';
+    
+        let leftWallMesh = createWall(200, wallHeight, 1, 0xfff0ff, { x: -100, y: wallYPosition, z: 0 }, { x: 0, y: Math.PI / 2, z: 0 });
         leftWallMesh.name = 'leftWall';
+    
+        let rightWallMesh = createWall(200, wallHeight, 1, 0xffff0f, { x: 100, y: wallYPosition, z: 0 }, { x: 0, y: -Math.PI / 2, z: 0 });
         rightWallMesh.name = 'rightWall';
-    }
+    
+        // Adjusting the roof
+        this.roof = new THREE.Mesh(
+            new THREE.PlaneGeometry(200, 200),
+            new THREE.MeshStandardMaterial()
+        );
+        this.roof.rotation.x = Math.PI / 2;
+        this.roof.position.y = wallHeight;
+        this.scene.add(this.roof);
+    
+        const roofShape = new CANNON.Plane();
+        const roofBody = new CANNON.Body();
+        roofBody.mass = 0;
+        roofBody.addShape(roofShape);
+        roofBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI * 0.5);
+        roofBody.position.y = wallHeight;
+        this.physics.addBody(roofBody);
+    
+        this.roof.physicObject = roofBody;
+    }    
     
     loadTextures() {
         this.game.resources.on('ready', () => {
@@ -577,6 +530,20 @@ export default class World {
         this.physics.step(1 / 75, this.game.time.delta, 3)
 
         this.contact = false
+
+        if(this.rightPortal.length > 0){
+            document.querySelector('.blue').classList.add('active')
+        }
+        else{
+            document.querySelector('.blue').classList.remove('active')
+        }
+
+        if(this.leftPortal.length > 0){
+            document.querySelector('.orange').classList.add('active')
+        }
+        else{
+            document.querySelector('.orange').classList.remove('active')
+        }
 
         if (this.rightPortal.length > 0 && this.leftPortal.length > 0) {
             const funnelConeAngle = Math.PI / 6; // Define the cone angle (e.g., 30 degrees)

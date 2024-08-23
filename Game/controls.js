@@ -48,7 +48,7 @@ export default class FirstPersonControl {
         this.game.world.physics.addBody(this.cameraBody);
 
         const loader = new GLTFLoader();
-        loader.load('/portal/lara webp (1024).glb', (gltf) => {
+        loader.load('/lara webp (1024).glb', (gltf) => {
             this.model = gltf.scene;
             this.model.scale.set(6, 6, 6);
             this.model.rotation.y = 1;
@@ -84,7 +84,7 @@ export default class FirstPersonControl {
             this.activeAction = this.idleAction;
             this.fadeToAction('idle', 0.2);
         });
-        loader.load('/portal/portal_gun.glb',(gltf) => {
+        loader.load('/portal_gun.glb',(gltf) => {
             this.model2 = gltf.scene;
             this.model2.scale.set(0.04, 0.04, 0.04);
             this.model2.traverse((child)=>{
@@ -286,9 +286,13 @@ export default class FirstPersonControl {
         }
 
         if (!this.isJumping) {
-            this.cameraBody.linearDamping = 0.999
+            this.cameraBody.linearDamping = 0.99
         } else {
             this.cameraBody.linearDamping = 0
+        }
+
+        if(this.cameraBody.velocity.y > 50){
+            this.cameraBody.velocity.y = 5
         }
 
         // Keep player upright

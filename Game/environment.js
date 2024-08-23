@@ -11,15 +11,13 @@ export default class Environment {
     }
     setLight() {
         RectAreaLightUniformsLib.init();
-        this.scene.add(new THREE.AmbientLight({ color: 0x000000 }))
-        const width = 24;
-        const height = 48;
-        const intensity = 3;
-        const rectLight = new THREE.RectAreaLight(0xffffff, intensity, width, height);
-        rectLight.position.set(0, 29.9, 0);
-        rectLight.lookAt(0, 0, 0);
-        rectLight.castShadow = true
-        rectLight.layers.enable(1)
-        this.scene.add(rectLight)
+        this.scene.add(new THREE.AmbientLight({ color: 0xffffff,intensity:0.2 }))
+        const intensity = 20000;
+        const pointLight = new THREE.PointLight(0xffffff, intensity);
+        pointLight.distance = 1000
+        pointLight.position.set(0, 50, 0);
+        pointLight.castShadow = true;
+        pointLight.layers.enable(1);
+        this.scene.add(pointLight);
     }
 }

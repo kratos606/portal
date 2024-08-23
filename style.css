@@ -19,11 +19,29 @@ body
 }
 .dot{
     position: absolute;
-    width: 5px;
-    height: 5px;
-    background-color: white;
     top: 50%;
     left: 50%;
     transform: translate(-50%,-50%);
     z-index: 100000;
+    pointer-events: none;
+}
+
+.blue{
+    stroke: blue;
+    stroke-width: 1px;
+    fill: none;
+}
+
+.orange{
+    stroke: orange;
+    stroke-width: 1px;
+    fill:none;
+}
+
+.blue.active{
+    fill: blue;
+}
+
+.orange.active{
+    fill: orange;
 }

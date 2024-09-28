@@ -58,7 +58,7 @@ To run this project locally, ensure you have the following:
 - **W/A/S/D or Arrow Keys:** Move around in the environment.
 - **Mouse:** Look around.
 - **Space:** Jump.
-- **enter portal:** Teleport to another location.
+- **Enter portal:** Teleport to another location.
 
 ### Customization
 

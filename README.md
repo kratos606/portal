@@ -1,7 +1,3 @@
-Here's a README file that you can use for the repo. It includes an overview of the project, installation steps, and usage details.
-
----
-
 # Portal
 
 **Portal** is a web-based 3D portal application built using Three.js and Cannon.js, allowing users to experience physics-driven teleportation mechanics and 3D navigation through various environments. This project integrates physics simulations with real-time 3D rendering and user-controlled teleportation across different spaces.

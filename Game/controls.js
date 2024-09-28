@@ -4,6 +4,12 @@ import Game from './game';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+const GROUP_DEFAULT = 1 << 0; // 0001
+const GROUP_PLAYER  = 1 << 1; // 0010
+const GROUP_CUBE    = 1 << 2; // 0100
+const GROUP_PORTAL  = 1 << 3; // 1000
+const GROUP_WALL    = 1 << 4; // 1 0000
+
 export default class FirstPersonControl {
     constructor() {
         this.game = new Game();
@@ -31,7 +37,9 @@ export default class FirstPersonControl {
             mass: 1,
             shape: new CANNON.Box(new CANNON.Vec3(0.1, 10, 0.1)),
             position: new CANNON.Vec3(0, 10, 0),
-            material: this.game.world.defaultMaterial
+            material: this.game.world.defaultMaterial,
+            collisionFilterGroup: GROUP_PLAYER,
+            collisionFilterMask: GROUP_WALL | GROUP_CUBE | GROUP_DEFAULT | GROUP_PORTAL, // Collide with walls, cubes, and default
         });
         this.cameraBody.linearDamping = 0.99;
         this.cameraBody.angularDamping = 1; // Prevent rotation

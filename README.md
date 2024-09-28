@@ -45,7 +45,7 @@ To run this project locally, ensure you have the following:
     npm run dev
     ```
 
-4. Open your browser and go to `http://localhost:3000` to view the portal application.
+4. Open your browser and go to `http://localhost:5173/` to view the portal application.
 
 ### Usage
 

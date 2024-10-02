@@ -59,7 +59,7 @@ To run this project locally, ensure you have the following:
 - **Mouse:** Look around.
 - **Space:** Jump.
 - **Enter portal:** Teleport to another location.
-- **E:** To Pick up cube
+- **E:** To Pick up cube and drop it
 
 ### Customization
 

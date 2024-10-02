@@ -163,11 +163,16 @@ class Portal {
     }
 }
 
-const GROUP_DEFAULT = 1 << 0; // 0001
-const GROUP_PLAYER  = 1 << 1; // 0010
-const GROUP_CUBE    = 1 << 2; // 0100
-const GROUP_PORTAL  = 1 << 3; // 1000
-const GROUP_WALL    = 1 << 4; // 1 0000
+const GROUP_DEFAULT    = 1 << 0;
+const GROUP_PLAYER     = 1 << 1;
+const GROUP_CUBE       = 1 << 2;
+const GROUP_PORTAL     = 1 << 3;
+const GROUP_WALL_BACK  = 1 << 4;
+const GROUP_WALL_FRONT = 1 << 5;
+const GROUP_WALL_LEFT  = 1 << 6;
+const GROUP_WALL_RIGHT = 1 << 7;
+const GROUP_FLOOR      = 1 << 8;
+const GROUP_ROOF       = 1 << 9;
 
 export default class World {
     constructor() {
@@ -211,6 +216,9 @@ export default class World {
         this.holdBody = null
 
         this.isJumping = true;
+
+        this.sourcePortal = null
+        this.destinationPortal = null
 
         this.onKeyDown = this.onKeyDown.bind(this)
         window.addEventListener('keydown', this.onKeyDown)
@@ -287,7 +295,7 @@ export default class World {
 
         if (intersects.length > 0) {
             const intersection = intersects[0]
-            const object = intersection.object
+            const wall = intersection.object
 
             const geometry = new THREE.CircleGeometry(5, 32)
             const material = new THREE.MeshBasicMaterial({ color: 0x000000 })
@@ -295,24 +303,35 @@ export default class World {
 
             const portalSize = new THREE.Vector2(10, 15)
             const halfPortalSize = portalSize.clone().multiplyScalar(0.5)
-            const wallSize = new THREE.Vector2(object.geometry.parameters.width, object.geometry.parameters.height)
+            const wallSize = new THREE.Vector2(wall.geometry.parameters.width, wall.geometry.parameters.height)
             const halfWallSize = wallSize.clone().multiplyScalar(0.5)
 
-            let localPosition = this.worldToLocal(object, intersection.point)
+            let localPosition = this.worldToLocal(wall, intersection.point)
 
             localPosition.x = THREE.MathUtils.clamp(localPosition.x, -halfWallSize.x + halfPortalSize.x, halfWallSize.x - halfPortalSize.x)
             localPosition.y = THREE.MathUtils.clamp(localPosition.y, -halfWallSize.y + halfPortalSize.y, halfWallSize.y - halfPortalSize.y)
 
-            const validPoint = this.localToWorld(object, localPosition)
+            const validPoint = this.localToWorld(wall, localPosition)
 
             circle.position.copy(validPoint)
-            circle.rotation.copy(object.rotation)
+            circle.rotation.copy(wall.rotation)
             circle.scale.y = 1.5
 
             circle.position.addScaledVector(circle.getWorldDirection(new THREE.Vector3()), 0.01)
+
+            const wallCollisionGroup = wall.collisionGroup;
+
+            const ALL_WALL_GROUPS =
+                GROUP_WALL_BACK |
+                GROUP_WALL_FRONT |
+                GROUP_WALL_LEFT |
+                GROUP_WALL_RIGHT |
+                GROUP_FLOOR |
+                GROUP_ROOF;
+
             this.boxBody = new CANNON.Body({
                 collisionFilterGroup: GROUP_PORTAL,
-                collisionFilterMask: GROUP_WALL | GROUP_DEFAULT | GROUP_CUBE | GROUP_PLAYER,
+                collisionFilterMask: (GROUP_PLAYER | GROUP_CUBE | GROUP_DEFAULT | ALL_WALL_GROUPS) & ~wallCollisionGroup,
             })
             this.boxBody.mass = 0
             this.boxBody.material = this.defaultMaterial
@@ -321,7 +340,8 @@ export default class World {
             this.boxBody.quaternion.copy(circle.quaternion)
             this.boxBody.position.copy(circle.position)
             this.boxBody.class = 'portal'
-            this.boxBody.object = intersects[0].object
+            this.boxBody.object = wall
+            this.boxBody.connectedWallCollisionGroup = intersection.object.collisionGroup
 
             let intersectionDetected = false
             if (event.button === 0) {
@@ -422,7 +442,7 @@ export default class World {
     setWorld() {
         const floorShape = new CANNON.Plane()
         const floorBody = new CANNON.Body({
-            collisionFilterGroup: GROUP_WALL,
+            collisionFilterGroup: GROUP_FLOOR,
             collisionFilterMask: GROUP_PLAYER | GROUP_CUBE | GROUP_PORTAL | GROUP_DEFAULT,
         })
         floorBody.mass = 0
@@ -450,10 +470,11 @@ export default class World {
         this.plane.position.set(0, 0, 0)
         this.scene.add(this.plane)
         this.plane.physicObject = floorBody
+        this.plane.collisionGroup = GROUP_FLOOR
 
         const wallShape = new CANNON.Box(new CANNON.Vec3(100, 50, 1))
 
-        const createWall = (width, height, depth, color, position, rotation) => {
+        const createWall = (width, height, depth, color, position, rotation, group) => {
             const wallTexture = new THREE.TextureLoader().load('/textures/concrete_modular_wall001a.png')
             wallTexture.repeat.set(4, 3)
             wallTexture.wrapS = THREE.RepeatWrapping
@@ -473,7 +494,7 @@ export default class World {
             this.scene.add(wallMesh)
 
             const wallBody = new CANNON.Body({
-                collisionFilterGroup: GROUP_WALL,
+                collisionFilterGroup: group,
                 collisionFilterMask: GROUP_PLAYER | GROUP_CUBE | GROUP_PORTAL | GROUP_DEFAULT,
             })
             wallBody.mass = 0
@@ -483,22 +504,23 @@ export default class World {
             this.physics.addBody(wallBody)
 
             wallMesh.physicObject = wallBody
+            wallMesh.collisionGroup = group
             return wallMesh
         }
 
         const wallHeight = 100
         const wallYPosition = wallHeight / 2
 
-        let backWallMesh = createWall(200, wallHeight, 1, 0xf0ffff, { x: 0, y: wallYPosition, z: 100 }, { x: 0, y: Math.PI, z: 0 })
+        let backWallMesh = createWall(200, wallHeight, 1, 0xf0ffff, { x: 0, y: wallYPosition, z: 100 }, { x: 0, y: Math.PI, z: 0 }, GROUP_WALL_BACK)
         backWallMesh.name = 'backWall'
 
-        let frontWallMesh = createWall(200, wallHeight, 1, 0xff0fff, { x: 0, y: wallYPosition, z: -100 }, { x: 0, y: 0, z: 0 })
+        let frontWallMesh = createWall(200, wallHeight, 1, 0xff0fff, { x: 0, y: wallYPosition, z: -100 }, { x: 0, y: 0, z: 0 }, GROUP_WALL_FRONT)
         frontWallMesh.name = 'frontWall'
 
-        let leftWallMesh = createWall(200, wallHeight, 1, 0xfff0ff, { x: -100, y: wallYPosition, z: 0 }, { x: 0, y: Math.PI / 2, z: 0 })
+        let leftWallMesh = createWall(200, wallHeight, 1, 0xfff0ff, { x: -100, y: wallYPosition, z: 0 }, { x: 0, y: Math.PI / 2, z: 0 }, GROUP_WALL_LEFT)
         leftWallMesh.name = 'leftWall'
 
-        let rightWallMesh = createWall(200, wallHeight, 1, 0xffff0f, { x: 100, y: wallYPosition, z: 0 }, { x: 0, y: -Math.PI / 2, z: 0 })
+        let rightWallMesh = createWall(200, wallHeight, 1, 0xffff0f, { x: 100, y: wallYPosition, z: 0 }, { x: 0, y: -Math.PI / 2, z: 0 }, GROUP_WALL_RIGHT)
         rightWallMesh.name = 'rightWall'
 
         const roofTexture = new THREE.TextureLoader().load('/textures/concrete_modular_ceiling001a.png')
@@ -520,7 +542,7 @@ export default class World {
 
         const roofShape = new CANNON.Plane()
         const roofBody = new CANNON.Body({
-            collisionFilterGroup: GROUP_WALL,
+            collisionFilterGroup: GROUP_ROOF,
             collisionFilterMask: GROUP_PLAYER | GROUP_CUBE | GROUP_PORTAL | GROUP_DEFAULT,
         })
         roofBody.mass = 0
@@ -530,6 +552,7 @@ export default class World {
         this.physics.addBody(roofBody)
 
         this.roof.physicObject = roofBody
+        this.roof.collisionGroup = GROUP_ROOF
     }
 
     loadTextures() {
@@ -606,6 +629,51 @@ export default class World {
         }
 
         if (this.rightPortal.length > 0 && this.leftPortal.length > 0) {
+
+            if(!this.sourcePortal || !this.defaultMaterial) {
+                this.sourcePortal = this.leftPortal[0]
+                this.destinationPortal = this.rightPortal[0]
+            }
+
+            let ref = null
+
+            for (let i = 0; i < this.physics.contacts.length; i++) {
+                const contact = this.physics.contacts[i]
+                const bodyA = contact.bi
+                const bodyB = contact.bj
+                if (
+                    (bodyA.class === 'companionCube' && bodyB.class === 'portal') ||
+                    (bodyA.class === 'portal' && bodyB.class === 'companionCube')
+                ) {
+                    const portalBody = bodyA.class === 'portal' ? bodyA : bodyB
+                    const portalRef = portalBody.ref
+                    if (portalRef === 'left') {
+                        ref = 'left'
+                    } else if (portalRef === 'right') {
+                        ref = 'right'
+                    }
+                    break
+                }
+            }
+            
+            if(ref === 'left'){
+                this.sourcePortal = this.leftPortal[0]
+                this.destinationPortal = this.rightPortal[0]
+            }
+
+            if(ref === 'right'){
+                this.sourcePortal = this.rightPortal[0]
+                this.destinationPortal = this.leftPortal[0]
+            }
+
+            const relativePosition = this.sourcePortal.worldToLocal(this.companionCube.position.clone())
+            relativePosition.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
+            const newCubePosition = this.destinationPortal.localToWorld(relativePosition)
+            this.cubeClone.position.copy(newCubePosition)
+            const relativeRotation = this.sourcePortal.quaternion.clone().invert().multiply(this.companionCube.quaternion)
+            relativeRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
+            this.cubeClone.quaternion.copy(this.destinationPortal.quaternion.clone().multiply(relativeRotation))
+            
             const funnelConeAngle = Math.PI / 6
             const playerPosition = this.game.camera.instance.position
 
@@ -682,13 +750,15 @@ export default class World {
 
                 if ((bodyA.class === 'companionCube' && bodyB.class === 'portal') ||
                     (bodyA.class === 'portal' && bodyB.class === 'companionCube')) {
-                    this.companionCubeBody.collisionFilterMask &= ~GROUP_WALL
+                    let portal = bodyA.class === 'portal' ? bodyA : bodyB
+                    this.companionCubeBody.collisionFilterMask &= ~portal.object.collisionGroup
                     cubePortalContact = true
                 }
 
                 if ((bodyA.class === 'camera' && bodyB.class === 'portal') ||
                     (bodyA.class === 'portal' && bodyB.class === 'camera')) {
-                    this.game.controls.cameraBody.collisionFilterMask &= ~GROUP_WALL
+                    let portal = bodyA.class === 'portal' ? bodyA : bodyB
+                    this.game.controls.cameraBody.collisionFilterMask &= ~portal.object.collisionGroup
                     playerPortalContact = true
                 }
 
@@ -725,12 +795,12 @@ export default class World {
                 }
             }
 
-            if (!cubePortalContact) {
-                this.companionCubeBody.collisionFilterMask = GROUP_DEFAULT | GROUP_WALL | GROUP_PORTAL | GROUP_PLAYER
+            if (!cubePortalContact && !this.holdBody) {
+                this.companionCubeBody.collisionFilterMask = GROUP_DEFAULT | GROUP_PLAYER | GROUP_PORTAL | GROUP_WALL_BACK | GROUP_WALL_FRONT | GROUP_WALL_LEFT | GROUP_WALL_RIGHT | GROUP_FLOOR | GROUP_ROOF
             }
 
             if (!playerPortalContact) {
-                this.game.controls.cameraBody.collisionFilterMask = GROUP_DEFAULT | GROUP_WALL | GROUP_PORTAL | GROUP_CUBE
+                this.game.controls.cameraBody.collisionFilterMask = GROUP_DEFAULT | GROUP_CUBE | GROUP_PORTAL | GROUP_WALL_BACK | GROUP_WALL_FRONT | GROUP_WALL_LEFT | GROUP_WALL_RIGHT | GROUP_FLOOR | GROUP_ROOF
             }
         } else {
             this.resetPortalColors()
@@ -810,17 +880,17 @@ export default class World {
         travelerMesh.quaternion.copy(targetRotation)
 
         if (travelerBody) {
-            const worldVelocity = new THREE.Vector3(travelerBody.velocity.x, travelerBody.velocity.y, travelerBody.velocity.z)
-
-            const relativeVelocity = worldVelocity.clone()
-            relativeVelocity.applyQuaternion(sourcePortal.quaternion.clone().invert())
-
-            relativeVelocity.applyQuaternion(halfTurn)
-
-            relativeVelocity.applyQuaternion(sourcePortal.pair.quaternion)
-
-            travelerBody.velocity.set(relativeVelocity.x, relativeVelocity.y, relativeVelocity.z)
+            const worldVelocity = new THREE.Vector3().copy(travelerBody.velocity);
+            const sourceRotationMatrix = new THREE.Matrix4().extractRotation(sourcePortal.matrixWorld);
+            const destinationRotationMatrix = new THREE.Matrix4().extractRotation(sourcePortal.pair.matrixWorld);
+            const sourceRotationMatrixInverse = new THREE.Matrix4().copy(sourceRotationMatrix).invert();
+            const localVelocity = worldVelocity.clone().applyMatrix4(sourceRotationMatrixInverse);
+            const halfTurnMatrix = new THREE.Matrix4().makeRotationY(Math.PI);
+            localVelocity.applyMatrix4(halfTurnMatrix);
+            const newWorldVelocity = localVelocity.clone().applyMatrix4(destinationRotationMatrix);
+            travelerBody.velocity.set(newWorldVelocity.x, newWorldVelocity.y, newWorldVelocity.z);
         }
+
     }
 
     checkLeftPortalTeleport(travelerMesh = this.game.camera.instance, travelerBody = this.game.controls.cameraBody) {
@@ -910,7 +980,7 @@ export default class World {
                 mass: 1,
                 material: this.defaultMaterial,
                 collisionFilterGroup: GROUP_CUBE,
-                collisionFilterMask: GROUP_WALL | GROUP_PLAYER | GROUP_DEFAULT | GROUP_PORTAL,
+                collisionFilterMask: GROUP_WALL_BACK | GROUP_WALL_FRONT | GROUP_WALL_LEFT | GROUP_WALL_RIGHT | GROUP_FLOOR | GROUP_ROOF | GROUP_PLAYER | GROUP_DEFAULT | GROUP_PORTAL,
             })
             this.companionCubeBody.addShape(cubeShape)
             this.companionCubeBody.position.copy(this.companionCube.position)
@@ -994,5 +1064,30 @@ export default class World {
 
         this.companionCubeBody.collisionFilterMask |= GROUP_PLAYER
         this.companionCubeBody.angularDamping = 0.5
+
+        if(this.isCubeInsideWalls(this.cubeClone.position)){
+            this.switchWithCompanion();
+        }
+    }
+
+    isCubeInsideWalls(position) {
+        const minX = -100;
+        const maxX = 100;
+        const minY = 0;
+        const maxY = 100;
+        const minZ = -100;
+        const maxZ = 100;
+
+        const { x, y, z } = position;
+
+        const insideX = x >= minX && x <= maxX;
+        const insideY = y >= minY && y <= maxY;
+        const insideZ = z >= minZ && z <= maxZ;
+
+        return insideX && insideY && insideZ;
+    }
+
+    switchWithCompanion() {
+        this.companionCubeBody.position.copy(this.cubeClone.position)
     }
 }

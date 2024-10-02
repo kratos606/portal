@@ -223,7 +223,7 @@ export default class World {
         let contactNormal = new CANNON.Vec3(0, 0, 0);
 
         this.physics.addEventListener("postStep", (e) => {
-            this.isJumping = true; // Assume jumping until proven otherwise
+            this.isJumping = true;
             if (this.physics.contacts.length > 0) {
                 for (let contact of this.physics.contacts) {
                     if (contact.bi.class == 'companionCube' || contact.bj.class == 'companionCube') {
@@ -274,83 +274,80 @@ export default class World {
     }
 
     shoot(event) {
-        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-        this.raycaster.setFromCamera({ x: 0, y: 0 }, this.game.camera.instance);
-    
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+        this.raycaster.setFromCamera({ x: 0, y: 0 }, this.game.camera.instance)
+
         const intersects = this.raycaster.intersectObjects([
             this.plane, this.roof, this.scene.getObjectByName('backWall'),
             this.scene.getObjectByName('frontWall'), this.scene.getObjectByName('leftWall'),
             this.scene.getObjectByName('rightWall')
-        ]);
-    
+        ])
+
         if (intersects.length > 0) {
-            const intersection = intersects[0];
-            const object = intersection.object;
-    
-            const geometry = new THREE.CircleGeometry(5, 32);
-            const material = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            const circle = new THREE.Mesh(geometry, material);
-    
-            const portalSize = new THREE.Vector2(10, 15);
-            const halfPortalSize = portalSize.clone().multiplyScalar(0.5);
-            const wallSize = new THREE.Vector2(object.geometry.parameters.width, object.geometry.parameters.height);
-            const halfWallSize = wallSize.clone().multiplyScalar(0.5);
-    
-            let localPosition = this.worldToLocal(object, intersection.point);
-    
-            localPosition.x = THREE.MathUtils.clamp(localPosition.x, -halfWallSize.x + halfPortalSize.x, halfWallSize.x - halfPortalSize.x);
-            localPosition.y = THREE.MathUtils.clamp(localPosition.y, -halfWallSize.y + halfPortalSize.y, halfWallSize.y - halfPortalSize.y);
-    
-            const validPoint = this.localToWorld(object, localPosition);
-    
-            circle.position.copy(validPoint);
-            circle.rotation.copy(object.rotation);
-            circle.scale.y = 1.5;
-    
-            circle.position.addScaledVector(circle.getWorldDirection(new THREE.Vector3()), 0.01);
-            
-            // Create the physics body for the portal
+            const intersection = intersects[0]
+            const object = intersection.object
+
+            const geometry = new THREE.CircleGeometry(5, 32)
+            const material = new THREE.MeshBasicMaterial({ color: 0x000000 })
+            const circle = new THREE.Mesh(geometry, material)
+
+            const portalSize = new THREE.Vector2(10, 15)
+            const halfPortalSize = portalSize.clone().multiplyScalar(0.5)
+            const wallSize = new THREE.Vector2(object.geometry.parameters.width, object.geometry.parameters.height)
+            const halfWallSize = wallSize.clone().multiplyScalar(0.5)
+
+            let localPosition = this.worldToLocal(object, intersection.point)
+
+            localPosition.x = THREE.MathUtils.clamp(localPosition.x, -halfWallSize.x + halfPortalSize.x, halfWallSize.x - halfPortalSize.x)
+            localPosition.y = THREE.MathUtils.clamp(localPosition.y, -halfWallSize.y + halfPortalSize.y, halfWallSize.y - halfPortalSize.y)
+
+            const validPoint = this.localToWorld(object, localPosition)
+
+            circle.position.copy(validPoint)
+            circle.rotation.copy(object.rotation)
+            circle.scale.y = 1.5
+
+            circle.position.addScaledVector(circle.getWorldDirection(new THREE.Vector3()), 0.01)
             this.boxBody = new CANNON.Body({
                 collisionFilterGroup: GROUP_PORTAL,
                 collisionFilterMask: GROUP_WALL | GROUP_DEFAULT | GROUP_CUBE | GROUP_PLAYER,
-            });
-            this.boxBody.mass = 0;
-            this.boxBody.material = this.defaultMaterial;
-            this.boxBody.collisionResponse = false;
-            this.boxBody.addShape(new CANNON.Box(new CANNON.Vec3(3.34, 5, 1.5)));
-            this.boxBody.quaternion.copy(circle.quaternion);
-            this.boxBody.position.copy(circle.position);
-            this.boxBody.class = 'portal';
-            this.boxBody.object = intersects[0].object;
-    
-            // Handle the intersection detection with the portal
-            let intersectionDetected = false;
+            })
+            this.boxBody.mass = 0
+            this.boxBody.material = this.defaultMaterial
+            this.boxBody.collisionResponse = false
+            this.boxBody.addShape(new CANNON.Box(new CANNON.Vec3(3.34, 5, 1.5)))
+            this.boxBody.quaternion.copy(circle.quaternion)
+            this.boxBody.position.copy(circle.position)
+            this.boxBody.class = 'portal'
+            this.boxBody.object = intersects[0].object
+
+            let intersectionDetected = false
             if (event.button === 0) {
                 this.rightPortal.forEach((rightPortal) => {
                     if (this.boxBody.object === rightPortal.physicObject.object && this.detectIntersection(this.boxBody, rightPortal.physicObject)) {
-                        intersectionDetected = true;
+                        intersectionDetected = true
                     }
-                });
+                })
             } else if (event.button === 2) {
                 this.leftPortal.forEach((leftPortal) => {
                     if (this.boxBody.object === leftPortal.physicObject.object && this.detectIntersection(this.boxBody, leftPortal.physicObject)) {
-                        intersectionDetected = true;
+                        intersectionDetected = true
                     }
-                });
+                })
             }
-    
+
             if (intersectionDetected) {
-                return;
+                return
             }
-    
-            this.physics.addBody(this.boxBody);
-            circle.physicObject = this.boxBody;
-    
-            const geometry1 = new THREE.PlaneGeometry(19, 19);
-            let materialPortal;
-    
+
+            this.physics.addBody(this.boxBody)
+            circle.physicObject = this.boxBody
+
+            const geometry1 = new THREE.PlaneGeometry(19, 19)
+            let materialPortal
+
             if (event.button === 0) {
                 this.materialBlue = new THREE.ShaderMaterial({
                     uniforms: {
@@ -359,10 +356,10 @@ export default class World {
                     },
                     vertexShader: document.getElementById('vertexShader').textContent,
                     fragmentShader: document.getElementById('fragmentShaderOrange').textContent
-                });
-                materialPortal = this.materialBlue;
-                this.boxBody.ref = 'left';
-                this.leftPortal.push(circle);
+                })
+                materialPortal = this.materialBlue
+                this.boxBody.ref = 'left'
+                this.leftPortal.push(circle)
             } else if (event.button === 2) {
                 this.materialOrange = new THREE.ShaderMaterial({
                     uniforms: {
@@ -371,47 +368,21 @@ export default class World {
                     },
                     vertexShader: document.getElementById('vertexShader').textContent,
                     fragmentShader: document.getElementById('fragmentShaderBlue').textContent
-                });
-                materialPortal = this.materialOrange;
-                this.boxBody.ref = 'right';
-                this.rightPortal.push(circle);
+                })
+                materialPortal = this.materialOrange
+                this.boxBody.ref = 'right'
+                this.rightPortal.push(circle)
             }
-    
-            const planePortal = new THREE.Mesh(geometry1, materialPortal);
-            planePortal.position.copy(circle.position);
-            planePortal.rotation.copy(circle.rotation);
-            planePortal.position.addScaledVector(circle.getWorldDirection(new THREE.Vector3()), 0.01);
-    
-            this.scene.add(planePortal);
-            circle.torus = planePortal;
-    
-            // Add a new plane for the player to stand on below the portal
-            const standPlaneGeometry = new THREE.BoxGeometry(10, 0.1,0.1); // Adjust size as needed
-            const standPlaneMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
-            const standPlane = new THREE.Mesh(standPlaneGeometry, standPlaneMaterial);
-    
-            // Position the stand plane below the portal
-            standPlane.position.copy(circle.position);
-            standPlane.position.y -= 5 * 1.5; // Adjust this value to control the height difference
-            standPlane.quaternion.copy(circle.quaternion)
-    
-            // Create the physics body for the stand plane
-            const standPlaneBody = new CANNON.Body({
-                mass: 0,
-                position: new CANNON.Vec3(standPlane.position.x, standPlane.position.y, standPlane.position.z),
-                shape: new CANNON.Box(new CANNON.Vec3(10 / 2, 0.1 / 2, 4 / 2)),
-                collisionFilterGroup: GROUP_DEFAULT,
-                collisionFilterMask: GROUP_PLAYER | GROUP_CUBE
-            });
 
-            standPlaneBody.quaternion.copy(standPlane.quaternion)
-    
-            this.physics.addBody(standPlaneBody);
+            const planePortal = new THREE.Mesh(geometry1, materialPortal)
+            planePortal.position.copy(circle.position)
+            planePortal.rotation.copy(circle.rotation)
+            planePortal.position.addScaledVector(circle.getWorldDirection(new THREE.Vector3()), 0.01)
 
-            circle.plane = standPlane;
-
+            this.scene.add(planePortal)
+            circle.torus = planePortal
         }
-    }    
+    }
 
     detectIntersection(bodyA, bodyB, buffer = 4) {
         const shapeA = bodyA.shapes[0]
@@ -563,7 +534,6 @@ export default class World {
 
     loadTextures() {
         this.game.resources.on('ready', () => {
-            // Load resources if needed
         })
     }
 
@@ -702,58 +672,6 @@ export default class World {
         this.managePortals()
 
         if (this.rightPortal.length > 0 && this.leftPortal.length > 0) {
-
-            let sourcePortal = null
-            let destinationPortal = null
-
-            // Determine which portal the cube is colliding with
-            for (let i = 0; i < this.physics.contacts.length; i++) {
-                const contact = this.physics.contacts[i]
-                const bodyA = contact.bi
-                const bodyB = contact.bj
-
-                if (
-                    (bodyA.class === 'companionCube' && bodyB.class === 'portal') ||
-                    (bodyA.class === 'portal' && bodyB.class === 'companionCube')
-                ) {
-                    // Identify the portal body and its reference
-                    const portalBody = bodyA.class === 'portal' ? bodyA : bodyB
-                    const portalRef = portalBody.ref // 'left' or 'right'
-
-                    if (portalRef === 'left') {
-                        sourcePortal = this.leftPortal[0]
-                        destinationPortal = this.rightPortal[0]
-                    } else if (portalRef === 'right') {
-                        sourcePortal = this.rightPortal[0]
-                        destinationPortal = this.leftPortal[0]
-                    }
-
-                    // Break out of the loop once the colliding portal is found
-                    break
-                }
-            }
-
-            // If the cube is not colliding with any portal, default to one pair
-            if (!sourcePortal || !destinationPortal) {
-                sourcePortal = this.leftPortal[0]
-                destinationPortal = this.rightPortal[0]
-            }
-
-            // Synchronize the clone's position and rotation using source and destination portals
-            const relativePosition = sourcePortal.worldToLocal(this.companionCube.position.clone())
-            relativePosition.applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
-            const newCubePosition = destinationPortal.localToWorld(relativePosition)
-            this.cubeClone.position.copy(newCubePosition)
-
-            // Synchronize rotation
-            const relativeRotation = sourcePortal.quaternion.clone().invert().multiply(this.companionCube.quaternion)
-            relativeRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI))
-            this.cubeClone.quaternion.copy(destinationPortal.quaternion.clone().multiply(relativeRotation))
-            
-            if(!this.holdBody){
-                this.checkCubePortalTeleport()
-            }
-
             let cubePortalContact = false
             let playerPortalContact = false
 
@@ -779,6 +697,32 @@ export default class World {
                     this.checkLeftPortalTeleport()
                     break
                 }
+
+                if ((bodyA.class === 'camera' && bodyB.ref === 'left') || (bodyA.ref === 'left' && bodyB.class === 'camera')) {
+                    this.checkRightPortalTeleport()
+                    break
+                }
+            }
+
+            for (let i = 0; i < this.physics.contacts.length; i++) {
+                const contact = this.physics.contacts[i]
+                const bodyA = contact.bi
+                const bodyB = contact.bj
+
+                if ((bodyA.class === 'companionCube' && bodyB.ref === 'right') ||
+                    (bodyA.ref === 'right' && bodyB.class === 'companionCube')) {
+                    if(!this.holdBody){
+                        this.checkLeftPortalTeleport(this.companionCube, this.companionCubeBody)
+                    }
+                    break
+                }
+
+                if ((bodyA.class === 'companionCube' && bodyB.ref === 'left') || (bodyA.ref === 'left' && bodyB.class === 'companionCube')) {
+                    if(!this.holdBody){
+                        this.checkRightPortalTeleport(this.companionCube, this.companionCubeBody)
+                    }
+                    break
+                }
             }
 
             if (!cubePortalContact) {
@@ -787,17 +731,6 @@ export default class World {
 
             if (!playerPortalContact) {
                 this.game.controls.cameraBody.collisionFilterMask = GROUP_DEFAULT | GROUP_WALL | GROUP_PORTAL | GROUP_CUBE
-            }
-
-            for (let i = 0; i < this.physics.contacts.length; i++) {
-                const contact = this.physics.contacts[i]
-                const bodyA = contact.bi
-                const bodyB = contact.bj
-
-                if ((bodyA.class === 'camera' && bodyB.ref === 'left') || (bodyA.ref === 'left' && bodyB.class === 'camera')) {
-                    this.checkRightPortalTeleport()
-                    break
-                }
             }
         } else {
             this.resetPortalColors()
@@ -829,7 +762,6 @@ export default class World {
             this.scene.remove(circleToRemove.box)
             this.scene.remove(circleToRemove.torus)
             this.physics.remove(circleToRemove.physicObject)
-            this.physics.remove(circleToRemove.plane)
             this.scene.remove(circleToRemove)
         }
 
@@ -842,32 +774,31 @@ export default class World {
             this.scene.remove(circleToRemove.box)
             this.scene.remove(circleToRemove.torus)
             this.physics.remove(circleToRemove.physicObject)
-            this.physics.remove(circleToRemove.plane)
             this.scene.remove(circleToRemove)
         }
     }
 
-    teleport(sourcePortal, camera, body) {
+    teleport(sourcePortal, travelerMesh, travelerBody) {
         const halfTurn = new THREE.Quaternion()
         halfTurn.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
 
         const forwardDirection = new THREE.Vector3()
-        camera.getWorldDirection(forwardDirection)
+        travelerMesh.getWorldDirection(forwardDirection)
 
-        const relativePos = sourcePortal.worldToLocal(camera.position.clone())
+        const relativePos = sourcePortal.worldToLocal(travelerMesh.position.clone())
         relativePos.applyQuaternion(halfTurn)
         const newPos = sourcePortal.pair.localToWorld(relativePos)
         if (newPos.y < 9.98) {
             newPos.y = 10
         }
-        body.position.copy(newPos)
+        travelerBody.position.copy(newPos)
 
-        const relativeRot = sourcePortal.quaternion.clone().invert().multiply(camera.quaternion)
+        const relativeRot = sourcePortal.quaternion.clone().invert().multiply(travelerMesh.quaternion)
         relativeRot.premultiply(halfTurn)
-        camera.quaternion.copy(sourcePortal.pair.quaternion.clone().multiply(relativeRot))
+        travelerMesh.quaternion.copy(sourcePortal.pair.quaternion.clone().multiply(relativeRot))
 
         const newForwardDirection = new THREE.Vector3()
-        camera.getWorldDirection(newForwardDirection)
+        travelerMesh.getWorldDirection(newForwardDirection)
         const targetRotation = new THREE.Quaternion().setFromRotationMatrix(
             new THREE.Matrix4().lookAt(
                 new THREE.Vector3(0, 0, 0),
@@ -876,57 +807,53 @@ export default class World {
             )
         )
 
-        camera.quaternion.copy(targetRotation)
+        travelerMesh.quaternion.copy(targetRotation)
 
-        const inTransform = sourcePortal
-        const outTransform = sourcePortal.pair
+        if (travelerBody) {
+            const worldVelocity = new THREE.Vector3(travelerBody.velocity.x, travelerBody.velocity.y, travelerBody.velocity.z)
 
-        if (body) {
-            // Convert the body's velocity to THREE.Vector3
-            const worldVelocity = new THREE.Vector3(body.velocity.x, body.velocity.y, body.velocity.z)
-    
-            // Transform the velocity into the portal's local space
             const relativeVelocity = worldVelocity.clone()
             relativeVelocity.applyQuaternion(sourcePortal.quaternion.clone().invert())
-    
-            // Apply the half-turn rotation
+
             relativeVelocity.applyQuaternion(halfTurn)
-    
-            // Transform the velocity into the destination portal's world space
+
             relativeVelocity.applyQuaternion(sourcePortal.pair.quaternion)
-    
-            // Set the body's velocity
-            body.velocity.set(relativeVelocity.x, relativeVelocity.y, relativeVelocity.z)
+
+            travelerBody.velocity.set(relativeVelocity.x, relativeVelocity.y, relativeVelocity.z)
         }
     }
 
-    checkLeftPortalTeleport() {
-        const portalForward = new THREE.Vector3()
-        this.rightPortal[0].getWorldDirection(portalForward)
+    checkLeftPortalTeleport(travelerMesh = this.game.camera.instance, travelerBody = this.game.controls.cameraBody) {
+        const portal = this.rightPortal[0];
 
-        const travelerPosition = this.game.camera.instance.position.clone()
-        const portalPosition = this.rightPortal[0].position.clone()
-        const portalToTraveler = travelerPosition.sub(portalPosition)
+        const portalForward = new THREE.Vector3();
+        portal.getWorldDirection(portalForward);
 
-        const dotProduct = portalForward.dot(portalToTraveler)
+        const travelerPosition = travelerMesh.position.clone();
+        const portalPosition = portal.position.clone();
+        const portalToTraveler = travelerPosition.sub(portalPosition);
+
+        const dotProduct = portalForward.dot(portalToTraveler);
 
         if (dotProduct < 0) {
-            this.teleport(this.rightPortal[0], this.game.camera.instance, this.game.controls.cameraBody)
+            this.teleport(portal, travelerMesh, travelerBody);
         }
     }
 
-    checkRightPortalTeleport() {
-        const portalForward = new THREE.Vector3()
-        this.leftPortal[0].getWorldDirection(portalForward)
+    checkRightPortalTeleport(travelerMesh = this.game.camera.instance, travelerBody = this.game.controls.cameraBody) {
+        const portal = this.leftPortal[0];
 
-        const travelerPosition = this.game.camera.instance.position.clone()
-        const portalPosition = this.leftPortal[0].position.clone()
-        const portalToTraveler = travelerPosition.sub(portalPosition)
+        const portalForward = new THREE.Vector3();
+        portal.getWorldDirection(portalForward);
 
-        const dotProduct = portalForward.dot(portalToTraveler)
+        const travelerPosition = travelerMesh.position.clone();
+        const portalPosition = portal.position.clone();
+        const portalToTraveler = travelerPosition.sub(portalPosition);
+
+        const dotProduct = portalForward.dot(portalToTraveler);
 
         if (dotProduct < 0) {
-            this.teleport(this.leftPortal[0], this.game.camera.instance, this.game.controls.cameraBody)
+            this.teleport(portal, travelerMesh, travelerBody);
         }
     }
 
@@ -1023,10 +950,10 @@ export default class World {
         const playerPosition = this.game.camera.instance.position
         const cubePosition = this.companionCube.position.clone()
         const distance = playerPosition.distanceTo(cubePosition)
-    
+
         if (distance <= this.pickupRange) {
             this.isHoldingCube = true
-    
+
             const holdPosition = this.getHoldPosition()
             this.holdBody = new CANNON.Body({
                 mass: 0,
@@ -1036,7 +963,7 @@ export default class World {
             })
             this.holdBody.position.copy(holdPosition)
             this.physics.addBody(this.holdBody)
-    
+
             this.holdingConstraint = new CANNON.PointToPointConstraint(
                 this.companionCubeBody,
                 new CANNON.Vec3(0, 0, 0),
@@ -1045,57 +972,27 @@ export default class World {
                 1e6
             )
             this.physics.addConstraint(this.holdingConstraint)
-    
+
             this.companionCubeBody.angularDamping = 1
-    
-            // Add this line to remove collision with the player
+
             this.companionCubeBody.collisionFilterMask &= ~GROUP_PLAYER
         }
     }
 
     dropCube() {
         this.isHoldingCube = false
-    
+
         if (this.holdingConstraint) {
             this.physics.removeConstraint(this.holdingConstraint)
             this.holdingConstraint = null
         }
-    
+
         if (this.holdBody) {
             this.physics.removeBody(this.holdBody)
             this.holdBody = null
         }
-    
-        // Add the player group back to the collision mask
+
         this.companionCubeBody.collisionFilterMask |= GROUP_PLAYER
         this.companionCubeBody.angularDamping = 0.5
-    }
-
-    checkCubePortalTeleport() {
-        const cubePosition = new THREE.Vector3(
-            this.companionCubeBody.position.x,
-            this.companionCubeBody.position.y,
-            this.companionCubeBody.position.z
-        )
-
-        const rightPortalPosition = this.rightPortal[0].position.clone()
-        const rightPortalForward = new THREE.Vector3()
-        this.rightPortal[0].getWorldDirection(rightPortalForward)
-        const rightPortalToCube = cubePosition.clone().sub(rightPortalPosition)
-        const rightDotProduct = rightPortalForward.dot(rightPortalToCube)
-
-        if (rightDotProduct < 0) {
-            this.teleport(this.rightPortal[0], this.companionCube, this.companionCubeBody)
-        }
-
-        const leftPortalPosition = this.leftPortal[0].position.clone()
-        const leftPortalForward = new THREE.Vector3()
-        this.leftPortal[0].getWorldDirection(leftPortalForward)
-        const leftPortalToCube = cubePosition.clone().sub(leftPortalPosition)
-        const leftDotProduct = leftPortalForward.dot(leftPortalToCube)
-
-        if (leftDotProduct < 0) {
-            this.teleport(this.leftPortal[0], this.companionCube, this.companionCubeBody)
-        }
     }
 }

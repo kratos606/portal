@@ -341,6 +341,8 @@ export default class World {
             this.boxBody.position.copy(circle.position)
             this.boxBody.class = 'portal'
             this.boxBody.object = wall
+            this.boxBody.portal = circle
+
             this.boxBody.connectedWallCollisionGroup = intersection.object.collisionGroup
 
             let intersectionDetected = false
@@ -751,6 +753,7 @@ export default class World {
                 if ((bodyA.class === 'companionCube' && bodyB.class === 'portal') ||
                     (bodyA.class === 'portal' && bodyB.class === 'companionCube')) {
                     let portal = bodyA.class === 'portal' ? bodyA : bodyB
+                    this.game.controls.cameraBody.collisionFilterMask &= ~portal.portal.pair.physicObject.object.collisionGroup
                     this.companionCubeBody.collisionFilterMask &= ~portal.object.collisionGroup
                     cubePortalContact = true
                 }
@@ -758,6 +761,7 @@ export default class World {
                 if ((bodyA.class === 'camera' && bodyB.class === 'portal') ||
                     (bodyA.class === 'portal' && bodyB.class === 'camera')) {
                     let portal = bodyA.class === 'portal' ? bodyA : bodyB
+                    this.game.controls.cameraBody.collisionFilterMask &= ~portal.portal.pair.physicObject.object.collisionGroup
                     this.game.controls.cameraBody.collisionFilterMask &= ~portal.object.collisionGroup
                     playerPortalContact = true
                 }

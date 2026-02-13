@@ -187,7 +187,7 @@ export default class World {
         this.rightPortal = []
         this.portalPhysics = false
         this.collisionDetected = false
-        this.virtualCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+        this.virtualCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.002, 1000)
         this.scene.add(this.virtualCamera)
         this.collisionDetected = false
         this.portalHandler = new Portal(this.scene, this.game.renderer.instance)

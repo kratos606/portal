@@ -457,9 +457,10 @@ export default class World {
         floorTexture.wrapS = THREE.RepeatWrapping
         floorTexture.wrapT = THREE.RepeatWrapping
 
-        // Replaced MeshStandardMaterial with MeshBasicMaterial to remove light reactivity & shadows
-        const floorMaterial = new THREE.MeshBasicMaterial({
-            map: floorTexture
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            map: floorTexture,
+            roughness: 0.2,
+            metalness: 0.1
         })
 
         this.plane = new THREE.Mesh(
@@ -467,6 +468,7 @@ export default class World {
             floorMaterial
         )
         this.plane.rotation.x = -Math.PI / 2
+        this.plane.receiveShadow = true
         this.plane.position.set(0, 0, 0)
         this.scene.add(this.plane)
         this.plane.physicObject = floorBody
@@ -480,8 +482,7 @@ export default class World {
             wallTexture.wrapS = THREE.RepeatWrapping
             wallTexture.wrapT = THREE.RepeatWrapping
 
-            // Replaced MeshStandardMaterial with MeshBasicMaterial
-            const wallMaterial = new THREE.MeshBasicMaterial({
+            const wallMaterial = new THREE.MeshStandardMaterial({
                 map: wallTexture,
                 side: THREE.DoubleSide
             })
@@ -529,8 +530,7 @@ export default class World {
         roofTexture.wrapS = THREE.RepeatWrapping
         roofTexture.wrapT = THREE.RepeatWrapping
 
-        // Replaced MeshStandardMaterial with MeshBasicMaterial
-        const roofMaterial = new THREE.MeshBasicMaterial({
+        const roofMaterial = new THREE.MeshStandardMaterial({
             map: roofTexture,
         })
 
@@ -955,20 +955,19 @@ export default class World {
 
             this.companionCube.position.set(0, 5, -5)
             this.companionCube.scale.set(0.13, 0.13, 0.13)
-            
-            // Replaced the GLTF standard material mappings with a new MeshBasicMaterial to remove lighting effects & shadows
+            this.companionCube.castShadow = true
+            this.companionCube.receiveShadow = true
+
             this.companionCube.traverse((child) => {
                 if (child.isMesh && child.material) {
                     if (child.material.map) {
                         child.material.map.colorSpace = THREE.SRGBColorSpace
+                        child.material.metalness = 0.7
                     }
-                    
-                    const basicMaterial = new THREE.MeshBasicMaterial({
-                        map: child.material.map,
-                        color: child.material.color || 0xffffff
-                    })
-                    
-                    child.material = basicMaterial;
+                    if (child.material.emissiveMap) {
+                        child.material.emissiveMap.colorSpace = THREE.SRGBColorSpace
+                    }
+                    child.material.needsUpdate = true
                 }
             })
 

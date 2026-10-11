@@ -1,78 +1,20 @@
-# Portal
+# Portal — Test Chamber 01
 
-**Portal** is a web-based 3D portal application built using Three.js and Cannon.js, allowing users to experience physics-driven teleportation mechanics and 3D navigation through various environments. This project integrates physics simulations with real-time 3D rendering and user-controlled teleportation across different spaces.
+A browser-based Portal-inspired test chamber built with Three.js and Cannon.js. The level includes linked blue/orange portals, a movable weighted cube, a floor button and an exit door.
 
-## Features
+## Play
 
-- **First-Person Controls:** Explore the 3D environment with intuitive first-person controls.
-- **Teleportation Mechanics:** Navigate through the portal system and teleport seamlessly to different locations.
-- **Physics Integration:** Realistic physics interactions using Cannon.js to simulate object movement, velocity, and teleportation effects.
-- **3D Model Loading:** Load and display 3D models using Three.js's GLTFLoader.
-  
-## Technologies Used
+```sh
+npm install
+npm run dev
+```
 
-- **Three.js:** A JavaScript library that makes WebGL easier to use for rendering 3D graphics.
-- **Cannon.js:** A lightweight 3D physics engine to simulate physics in the 3D environment.
-- **GLTFLoader:** For loading 3D models in GLTF format.
-  
-## Getting Started
+Click **Begin** to lock the mouse. Use WASD to move, mouse to look, Space to jump, left/right click to place blue/orange portals on the light-colored panels, E to pick up/drop the cube, and F to throw it. Put the cube on the illuminated button and walk out through the exit. Press Escape to release the mouse.
 
-### Prerequisites
+## Implementation
 
-To run this project locally, ensure you have the following:
+The linked-space transform is `destination.matrixWorld * rotationY(π) * inverse(source.matrixWorld)` (see `Game/portalMath.js`). The same rigid transform drives the virtual portal camera, traveler position, orientation, linear velocity and cube angular velocity. Plane crossing (front to back, within the aperture) triggers traversal; portal placement rebuilds both the visual and Cannon collision slabs around the aperture. Each portal has ping-pong render targets, a destination-side oblique near clip plane and bounded previous-frame recursive views. A brief post-teleport input grace period keeps launch momentum from being immediately overwritten by walking controls.
 
-- Node.js (latest version recommended)
-- npm (Node Package Manager)
+The reference is the [Portal-Base](https://github.com/SonicEraZoR/Portal-Base) source, especially `prop_portal_shared.cpp` (linked-space transform) and `prop_portal.cpp` (position, eye angle and velocity during teleport). This is an original web adaptation and a **Portal-inspired introductory chamber**, not a reproduction of Valve's maps, assets, or complete collision simulator. Extremely fast bodies and objects partly straddling a portal do not yet have Source's continuous, duplicated-through-the-plane physics.
 
-### Installation
-
-1. Clone the repository:
-
-    ```bash
-    git clone https://github.com/kratos606/portal.git
-    cd portal
-    ```
-
-2. Install the required dependencies:
-
-    ```bash
-    npm install
-    ```
-
-3. Start the development server:
-
-    ```bash
-    npm run dev
-    ```
-
-4. Open your browser and go to `http://localhost:5173/` to view the portal application.
-
-### Usage
-
-- Use the keyboard and mouse to control your character’s movement through the 3D space.
-- Teleport by interacting with portals scattered throughout the environment.
-- Observe realistic physics behavior as objects move and interact within the scene.
-
-### Controls
-
-- **W/A/S/D or Arrow Keys:** Move around in the environment.
-- **Mouse:** Look around.
-- **Space:** Jump.
-- **Enter portal:** Teleport to another location.
-- **E:** To Pick up cube and drop it
-
-### Customization
-
-You can easily customize the project by adding your own 3D models, textures, and environments. Simply place the models in the `src/assets` folder and reference them in the scene files.
-
-### Contribution
-
-Contributions are welcome! Feel free to submit a pull request or open an issue if you find any bugs or have feature requests.
-
-### License
-
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
----
-
-Let me know if you need further customization for the project!
+Run `npm test` to check the linked transform and crossing behavior; `npm run build` for a production build.

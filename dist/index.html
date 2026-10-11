@@ -2,149 +2,134 @@
 <html lang="en">
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Three.js - Template - Complex</title>
-  <script type="module" crossorigin src="./assets/index-DPhLSK7w.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-C6hEkQc0.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aperture Science — Enrichment Center</title>
+  <meta name="description" content="A portal mechanics test chamber built with three.js." />
+  <link rel="preconnect" href="data:," />
+  <script type="module" crossorigin src="./assets/index-Bgu8ngJW.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-MDO4btSl.css">
 </head>
 
 <body>
-    <div class="dot">
-        <svg height="100" width="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <!-- Dots -->
-            <circle cx="50" cy="40" r="2" fill="white"/>
-            <circle cx="50" cy="60" r="2" fill="white"/>
-            <circle cx="40" cy="50" r="2" fill="white"/>
-            <circle cx="60" cy="50" r="2" fill="white"/>
-            <!-- Arcs -->
-            <g>
-            <path class="blue" d="M 50 25 A 25 25 0 0 1 70 40 L 66 44 A 21 21 0 0 0 55 29 Z"/>
-            <path class="orange" d="M 50 75 A 25 25 0 0 1 30 60 L 34 56 A 21 21 0 0 0 45 71 Z"/>
-            </g>
-        </svg>
+  <canvas class="webgl"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <div class="hud" id="hud" aria-hidden="true">
+    <div class="crosshair" id="crosshair"></div>
+
+    <div class="hud-top">
+      <div class="chamber-tag">
+        <span class="chamber-tag__label">Test Chamber</span>
+        <span class="chamber-tag__value">04</span>
+      </div>
+      <div class="fps" id="fps">-- fps</div>
     </div>
-    <div class="analog"></div>
-    <canvas class="webgl"></canvas>
-    <script id="vertexShader" type="x-shader/x-vertex">
-        varying vec2 vUv;
-        void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-    </script>
-    <script id="fragmentShaderBlue" type="x-shader/x-fragment">
-        uniform vec2 iResolution;
-        uniform float iTime;
-        varying vec2 vUv;
-    
-        float snoise(vec3 uv, float res) {
-            const vec3 s = vec3(1e0, 1e2, 1e3);
-            
-            uv *= res;
-            
-            vec3 uv0 = floor(mod(uv, res)) * s;
-            vec3 uv1 = floor(mod(uv + vec3(1.0), res)) * s;
-            
-            vec3 f = fract(uv);
-            f = f * f * (3.0 - 2.0 * f);
-    
-            vec4 v = vec4(uv0.x + uv0.y + uv0.z, uv1.x + uv0.y + uv0.z,
-                        uv0.x + uv1.y + uv0.z, uv1.x + uv1.y + uv0.z);
-    
-            vec4 r = fract(sin(v * 1e-1) * 1e3);
-            float r0 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
-            
-            r = fract(sin((v + uv1.z - uv0.z) * 1e-1) * 1e3);
-            float r1 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
-            
-            return mix(r0, r1, f.z) * 2.0 - 1.0;
-        }
-    
-        void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-            vec2 p = -0.5 + fragCoord.xy / iResolution.xy;
-            p.x *= (iResolution.x * 1.5) / iResolution.x;
-    
-            float color = 3.0 - (3.0 * length(2.0 * p));
-            
-            vec3 coord = vec3(atan(p.x, p.y) / 6.2832 + 0.5, length(p) * 0.4, 0.5);
-            
-            coord = 1.0 - coord;
-            
-            for (int i = 1; i <= 1; i++) {
-                float power = pow(2.0, float(i));
-                color += (0.4 / power) * snoise(coord + vec3(0.0, -iTime * 0.05, iTime * 0.01), power * 16.0);
-            }
-            color = 1.0 - color;
-            color *= 2.7;
-            
-            color *= smoothstep(0.43, 0.4, length(p));
-    
-            if (color < 0.6) discard; // Discard fragments that are too dark
-    
-            fragColor = vec4(pow(max(color, 0.0), 3.0) * 0.15, pow(max(color, 0.0), 2.0) * 0.4, color, color > 0.1 ? 1.0 : 0.0);
-        }
-    
-        void main() {
-            mainImage(gl_FragColor, vUv * iResolution.xy);
-        }
-    </script>    
-    <script id="fragmentShaderOrange" type="x-shader/x-fragment">
-        uniform vec2 iResolution;
-        uniform float iTime;
-        varying vec2 vUv;
-    
-        float snoise(vec3 uv, float res) {
-            const vec3 s = vec3(1e0, 1e2, 1e3);
-            
-            uv *= res;
-            
-            vec3 uv0 = floor(mod(uv, res)) * s;
-            vec3 uv1 = floor(mod(uv + vec3(1.0), res)) * s;
-            
-            vec3 f = fract(uv);
-            f = f * f * (3.0 - 2.0 * f);
-    
-            vec4 v = vec4(uv0.x + uv0.y + uv0.z, uv1.x + uv0.y + uv0.z,
-                        uv0.x + uv1.y + uv0.z, uv1.x + uv1.y + uv0.z);
-    
-            vec4 r = fract(sin(v * 1e-1) * 1e3);
-            float r0 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
-            
-            r = fract(sin((v + uv1.z - uv0.z) * 1e-1) * 1e3);
-            float r1 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
-            
-            return mix(r0, r1, f.z) * 2.0 - 1.0;
-        }
-    
-        void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-            vec2 p = -0.5 + fragCoord.xy / iResolution.xy;
-            p.x *= (iResolution.x * 1.5) / iResolution.x;
-    
-            float color = 3.0 - (3.0 * length(2.0 * p));
-            
-            vec3 coord = vec3(atan(p.x, p.y) / 6.2832 + 0.5, length(p) * 0.4, 0.5);
-            
-            coord = 1.0 - coord;
-            
-            for (int i = 1; i <= 1; i++) {
-                float power = pow(2.0, float(i));
-                color += (0.4 / power) * snoise(coord + vec3(0.0, -iTime * 0.05, iTime * 0.01), power * 16.0);
-            }
-            color = 1.0 - color;
-            color *= 2.7;
-            
-            color *= smoothstep(0.43, 0.4, length(p));
-    
-            if (color < 0.6) discard; // Discard fragments that are too dark
-    
-            fragColor = vec4(color, pow(max(color, 0.0), 2.0) * 0.4, pow(max(color, 0.0), 3.0) * 0.15, color > 0.1 ? 1.0 : 0.0);
-        }
-    
-        void main() {
-            mainImage(gl_FragColor, vUv * iResolution.xy);
-        }
-    </script>
+
+    <div class="portal-status" id="portalStatus">
+      <div class="portal-status__row" data-side="blue">
+        <span class="portal-status__swatch"></span>
+        <span class="portal-status__label">Portal One</span>
+        <span class="portal-status__state" data-state>inactive</span>
+      </div>
+      <div class="portal-status__row" data-side="orange">
+        <span class="portal-status__swatch"></span>
+        <span class="portal-status__label">Portal Two</span>
+        <span class="portal-status__state" data-state>inactive</span>
+      </div>
+    </div>
+
+    <div class="objective" id="objective">
+      <span class="objective__dot"></span>
+      <span class="objective__text">Place two portals to reach the far platform.</span>
+    </div>
+
+    <div class="prompt" id="prompt"></div>
+
+    <div class="hud-stats" id="hudStats"></div>
+  </div>
+
+  <!-- ===================== Pause ===================== -->
+  <div class="overlay overlay--pause" id="pauseOverlay" hidden>
+    <div class="pause-card">
+      <h2>Simulation paused</h2>
+      <p>Click anywhere to resume testing.</p>
+      <button class="btn btn--ghost" id="resumeBtn">Resume</button>
+      <button class="btn btn--ghost" id="quitBtn">Return to menu</button>
+    </div>
+  </div>
+
+  <!-- ===================== Menu / guide ===================== -->
+  <div class="overlay overlay--menu" id="menuOverlay">
+    <div class="menu">
+      <div class="menu__brand">
+        <div class="aperture aperture--lg" id="menuAperture"></div>
+        <div class="menu__titles">
+          <h1>Aperture Science</h1>
+          <p class="menu__subtitle">Computer-Aided Enrichment Center</p>
+        </div>
+      </div>
+
+      <p class="menu__blurb">
+        Portal mechanics reconstructed from the Valve <em>Portal</em> source: stencil-buffer
+        recursive views, hardware clip planes, ghost renderables for straddling objects,
+        and centre-crosses-plane teleportation.
+      </p>
+
+      <div class="guide">
+        <div class="guide__col">
+          <h3>Movement</h3>
+          <dl>
+            <div><dt>W A S D</dt><dd>Move</dd></div>
+            <div><dt>Space</dt><dd>Jump</dd></div>
+            <div><dt>Shift</dt><dd>Sprint</dd></div>
+            <div><dt>Esc</dt><dd>Pause / release mouse</dd></div>
+          </dl>
+        </div>
+        <div class="guide__col">
+          <h3>Portal device</h3>
+          <dl>
+            <div><dt>Left click</dt><dd>Fire portal one <em class="c-blue">blue</em></dd></div>
+            <div><dt>Right click</dt><dd>Fire portal two <em class="c-orange">orange</em></dd></div>
+            <div><dt>E</dt><dd>Pick up / drop the cube</dd></div>
+            <div><dt>R</dt><dd>Reset the chamber</dd></div>
+          </dl>
+        </div>
+        <div class="guide__col">
+          <h3>Objective</h3>
+          <p class="guide__prose">
+            Route the Thermal Discouragement Beam into its receptor. The beam will not
+            turn corners on its own — that is what the portals are for.
+          </p>
+        </div>
+      </div>
+
+      <div class="menu__actions">
+        <button class="btn btn--primary" id="startBtn">
+          <span class="btn__iris"></span>
+          <span>Begin testing</span>
+        </button>
+        <p class="menu__hint">Your browser will ask to lock the pointer.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== Loading ===================== -->
+  <div class="overlay overlay--loading" id="loadingOverlay">
+    <div class="loading">
+      <div class="aperture aperture--xl" id="loadingAperture"></div>
+      <h2 class="loading__title">Aperture Science</h2>
+      <p class="loading__sub">Initialising enrichment systems</p>
+      <div class="progress">
+        <div class="progress__bar"><div class="progress__fill" id="progressFill"></div></div>
+        <div class="progress__meta">
+          <span id="progressLabel">Preparing…</span>
+          <span id="progressPercent">0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 
 </html>

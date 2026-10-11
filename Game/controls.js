@@ -1,314 +1,309 @@
-import * as THREE from 'three';
-import CANNON from 'cannon';
-import Game from './game';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import EventEmitter from './Utils/EventEmitter.js'
+import * as THREE from 'three'
+import CANNON from 'cannon'
+import Game from './game.js'
+import {
+  LAYER_VIEWMODEL,
+  PLAYER_RADIUS,
+  PLAYER_EYE_OFFSET,
+} from './portal/constants.js'
+import { shouldTeleport, computeTeleport, applyToBody } from './portal/PortalTeleport.js'
 
-const GROUP_DEFAULT    = 1 << 0;
-const GROUP_PLAYER     = 1 << 1;
-const GROUP_CUBE       = 1 << 2;
-const GROUP_PORTAL     = 1 << 3;
-const GROUP_WALL_BACK  = 1 << 4;
-const GROUP_WALL_FRONT = 1 << 5;
-const GROUP_WALL_LEFT  = 1 << 6;
-const GROUP_WALL_RIGHT = 1 << 7;
-const GROUP_FLOOR      = 1 << 8;
-const GROUP_ROOF       = 1 << 9;
+/**
+ * First person controller.
+ *
+ * The player is a single cannon sphere with fixedRotation. Valve curls the
+ * player's AABB into a ball when they transit a floor portal
+ * (prop_portal.cpp:1039); a sphere body gets the same "no corners to catch on"
+ * property without the hack, which is what makes free portal traversal feel
+ * right here.
+ */
 
-export default class FirstPersonControl {
-    constructor() {
-        this.game = new Game();
-        this.camera = this.game.camera.instance;
-        this.domElement = this.game.canvas;
-        this.enabled = false;
-        this.xSpeed = 0.5;
-        this.ySpeed = 0.5;
-        this.yMinLimit = -90;
-        this.yMaxLimit = 90;
-        this.x = 0;
-        this.y = 0;
-        this.active = 0;
-        this.velocity = new THREE.Vector3();
-        this.vector = new THREE.Vector3();
-        this.teleportAngle = 0;
-        this.isJumping = true;
-        this.teleportPosition = new CANNON.Vec3(0, 10, 0);
-        this.previousPosition = new THREE.Vector3();
-        this.isMoving = false;
+const UP = new THREE.Vector3(0, 1, 0)
+const HALF_PI = Math.PI / 2
 
-        this.pressedKeys = {};
+export default class Controls extends EventEmitter {
+  constructor() {
+    super()
 
-        this.cameraBody = new CANNON.Body({
-            mass: 1,
-            shape: new CANNON.Box(new CANNON.Vec3(0.1, 10, 0.1)),
-            position: new CANNON.Vec3(0, 10, 0),
-            material: this.game.world.defaultMaterial,
-            collisionFilterGroup: GROUP_PLAYER,
-            collisionFilterMask: GROUP_DEFAULT | GROUP_WALL_BACK | GROUP_WALL_FRONT | GROUP_WALL_LEFT | GROUP_WALL_RIGHT | GROUP_FLOOR | GROUP_ROOF | GROUP_PORTAL | GROUP_PLAYER | GROUP_CUBE
-        });
-        this.cameraBody.linearDamping = 0.99;
-        this.cameraBody.angularDamping = 1; // Prevent rotation
+    this.game = new Game()
+    this.camera = this.game.camera
+    this.physics = this.game.physics
+    this.sizes = this.game.sizes
 
-        this.cameraBody.fixedRotation = true; // Fix rotation
-        this.cameraBody.updateMassProperties(); // Update mass properties
+    this.walkSpeed = 4.4
+    this.sprintSpeed = 7.2
+    this.jumpSpeed = 6.2
+    this.groundAccel = 14
+    this.airAccel = 2.2
 
-        this.cameraBody.class = 'camera';
-        this.cameraBody.addEventListener('collide', (event) => {
-            if (event.body.class === 'portal') {
-                this.game.world.collisionDetected = true;
-            }
-        });
-        this.game.world.physics.addBody(this.cameraBody);
+    this.keys = Object.create(null)
+    this.grounded = false
+    this.wish = new THREE.Vector3()
+    this.pointerLocked = false
 
-        const loader = new GLTFLoader();
-        loader.load('/lara webp (1024).glb', (gltf) => {
-            this.model = gltf.scene;
-            this.model.scale.set(6, 6, 6);
-            this.model.rotation.y = 1;
-            this.game.scene.add(this.model);
+    this._fwd = new THREE.Vector3()
+    this._right = new THREE.Vector3()
+    this._rayFrom = new CANNON.Vec3()
+    this._rayTo = new CANNON.Vec3()
+    this._linkQuat = new THREE.Quaternion()
+    this._euler = new THREE.Euler(0, 0, 0, 'YXZ')
+    this._centre = new THREE.Vector3()
+    this._prevCentre = new THREE.Vector3()
+    this._bodyQuat = new THREE.Quaternion()
+    this._bodyVel = new THREE.Vector3()
 
-            this.model.traverse(function (object) {
-                object.class = 'player'
-                if (object.isMesh) object.castShadow = true;
-            });
+    this.setBody()
+    this.setListeners()
+    this.setViewmodel()
+  }
 
-            this.skeleton = new THREE.SkeletonHelper(this.model);
-            this.skeleton.visible = false;
-            this.game.scene.add(this.skeleton);
+  setBody() {
+    const body = new CANNON.Body({
+      mass: 80,
+      shape: new CANNON.Sphere(PLAYER_RADIUS),
+      material: this.physics.playerMaterial,
+      linearDamping: 0.02,
+      angularDamping: 1,
+    })
+    body.fixedRotation = true
+    body.updateMassProperties()
+    body.position.set(0, PLAYER_RADIUS + 0.05, 8)
+    body.collisionFilterGroup = this.physics.groupPlayer
+    body.collisionFilterMask = this.physics.defaultMask
+    body.allowSleep = false
+    this.physics.world.addBody(body)
+    this.body = body
+    this.spawnPoint = body.position.clone()
+  }
 
-            const animations = gltf.animations;
+  setViewmodel() {
+    this.viewmodel = new THREE.Group()
+    this.viewmodel.layers.set(LAYER_VIEWMODEL)
+    this.camera.instance.add(this.viewmodel)
 
-            this.mixer = new THREE.AnimationMixer(this.model);
+    const gun = this.game.resources?.items?.portalGun
+    if (gun) {
+      const model = gun.scene.clone(true)
+      // fit the prop into a sane viewmodel scale/position
+      const box = new THREE.Box3().setFromObject(model)
+      const size = box.getSize(new THREE.Vector3())
+      const target = 0.34
+      const scale = target / Math.max(size.x, size.y, size.z)
+      model.scale.setScalar(scale)
 
-            this.idleAction = this.mixer.clipAction(animations[1]);
-            this.walkAction = this.mixer.clipAction(animations[4]);
-            this.runAction = this.mixer.clipAction(animations[0]);
-            this.leftAction = this.mixer.clipAction(animations[3]);
-            this.rightAction = this.mixer.clipAction(animations[2]);
-
-            this.actions = {
-                'idle': this.idleAction,
-                'walk': this.walkAction,
-                'back': this.runAction,
-                'left': this.leftAction,
-                'right': this.rightAction
-            };
-
-            this.activeAction = this.idleAction;
-            this.fadeToAction('idle', 0.2);
-        });
-        loader.load('/portal_gun.glb',(gltf) => {
-            this.model2 = gltf.scene;
-            this.model2.scale.set(0.04, 0.04, 0.04);
-            this.model2.traverse((child)=>{
-                child.layers.enable(1)
-            })
-            this.game.scene.add(this.model2);
-        })
-
-        let upVector = new CANNON.Vec3(0, 1, 0);
-        let contactNormal = new CANNON.Vec3(0, 0, 0);
-
-        this.game.world.physics.addEventListener("postStep", (e) => {
-            this.isJumping = true; // Assume jumping until proven otherwise
-            if (this.game.world.physics.contacts.length > 0) {
-                for (let contact of this.game.world.physics.contacts) {
-                    if (contact.bi.class == 'camera' || contact.bj.class == 'camera') {
-                        if (contact.bi.class == 'camera') {
-                            contactNormal = new CANNON.Vec3().copy(contact.ni).scale(-1);
-                        } else {
-                            contactNormal = new CANNON.Vec3().copy(contact.ni);
-                        }
-                        const collisionResponse = contact.bi.collisionResponse && contact.bj.collisionResponse;
-                        this.isJumping = !(collisionResponse && contactNormal.dot(upVector) > 0.5);
-                    }
-                }
-            }
-        });
-
-        this.controls = new PointerLockControls(this.camera, document.body);
-        this.initEventListeners();
+      const centre = box.getCenter(new THREE.Vector3()).multiplyScalar(scale)
+      model.position.set(0.16 - centre.x, -0.16 - centre.y, -0.34 - centre.z)
+      model.rotation.set(0, Math.PI * 0.02, 0)
+      model.traverse((o) => {
+        if (o.isMesh) {
+          o.layers.set(LAYER_VIEWMODEL)
+          o.castShadow = false
+          o.receiveShadow = false
+          if (o.material) o.material = Array.isArray(o.material)
+            ? o.material.map((m) => m.clone())
+            : o.material.clone()
+        }
+      })
+      this.viewmodel.add(model)
+      this.gunModel = model
+    } else {
+      // no gun asset: a simple barrel so the view is never empty
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.06, 0.5, 16),
+        new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.35, metalness: 0.6 })
+      )
+      barrel.rotation.x = Math.PI / 2
+      barrel.position.set(0.17, -0.15, -0.32)
+      barrel.layers.set(LAYER_VIEWMODEL)
+      this.viewmodel.add(barrel)
     }
 
-    initEventListeners() {
-        document.addEventListener('fullscreenchange', this.onFullScreenChange.bind(this));
-        this.domElement.addEventListener('click', this.requestPointerLock.bind(this));
-        document.addEventListener('keydown', this.onKeyDown.bind(this));
-        document.addEventListener('keyup', this.onKeyUp.bind(this));
+    this._gunBase = new THREE.Vector3()
+    this._gunSway = 0
+  }
+
+  setListeners() {
+    document.addEventListener('keydown', (e) => {
+      this.keys[e.code] = true
+      if (e.code === 'Space') e.preventDefault()
+    })
+    document.addEventListener('keyup', (e) => {
+      this.keys[e.code] = false
+    })
+    window.addEventListener('blur', () => {
+      for (const k in this.keys) this.keys[k] = false
+    })
+
+    const controls = this.camera.controls
+    if (controls) {
+      controls.addEventListener('lock', () => {
+        this.pointerLocked = true
+        this.trigger('lock')
+      })
+      controls.addEventListener('unlock', () => {
+        this.pointerLocked = false
+        this.trigger('unlock')
+      })
+    }
+  }
+
+  lock() {
+    this.camera.controls?.lock()
+  }
+  unlock() {
+    this.camera.controls?.unlock()
+  }
+
+  /** Camera-relative wish direction, flat on the ground plane. */
+  updateWish() {
+    const k = this.keys
+    let fwd = 0
+    let side = 0
+    if (k.KeyW || k.ArrowUp) fwd += 1
+    if (k.KeyS || k.ArrowDown) fwd -= 1
+    if (k.KeyD || k.ArrowRight) side += 1
+    if (k.KeyA || k.ArrowLeft) side -= 1
+
+    this.camera.instance.getWorldDirection(this._fwd)
+    this._fwd.y = 0
+    if (this._fwd.lengthSq() < 1e-6) this._fwd.set(0, 0, -1)
+    this._fwd.normalize()
+    this._right.crossVectors(this._fwd, UP).normalize()
+
+    this.wish.set(0, 0, 0)
+    this.wish.addScaledVector(this._fwd, fwd)
+    this.wish.addScaledVector(this._right, side)
+    if (this.wish.lengthSq() > 1) this.wish.normalize()
+  }
+
+  updateGrounded() {
+    const p = this.body.position
+    this._rayFrom.set(p.x, p.y, p.z)
+    this._rayTo.set(p.x, p.y - (PLAYER_RADIUS + 0.14), p.z)
+    const hit = this.physics.raycastClosest(this._rayFrom, this._rayTo, {
+      mask: this.body.collisionFilterMask,
+      group: this.body.collisionFilterGroup,
+    })
+    const r = this.physics.rayResult
+    this.grounded = !!hit && r.hasHit && r.hitNormalWorld.y > 0.4
+  }
+
+  move(dt) {
+    this.updateWish()
+    this.updateGrounded()
+
+    const sprinting = !!(this.keys.ShiftLeft || this.keys.ShiftRight)
+    const speed = sprinting ? this.sprintSpeed : this.walkSpeed
+    const accel = this.grounded ? this.groundAccel : this.airAccel
+
+    const targetX = this.wish.x * speed
+    const targetZ = this.wish.z * speed
+    const v = this.body.velocity
+    const t = Math.min(1, accel * dt)
+    v.x += (targetX - v.x) * t
+    v.z += (targetZ - v.z) * t
+
+    if (this.grounded && this.keys.Space) {
+      v.y = this.jumpSpeed
+      this.grounded = false
+    }
+  }
+
+  /**
+   * Portal traversal. Returns true if the player was teleported this frame.
+   * @param {Array<import('./portal/Portal.js').default>} portals
+   */
+  checkPortals(portals) {
+    const p = this.body.position
+    this._centre.set(p.x, p.y, p.z)
+
+    let moved = false
+    for (const portal of portals) {
+      if (!portal.active || !portal.pair) continue
+      if (!shouldTeleport(portal, this._centre, PLAYER_RADIUS, this._prevCentre)) continue
+
+      const result = computeTeleport(portal, {
+        origin: this._centre,
+        centre: this._centre,
+        quaternion: this._bodyQuat.set(
+          this.body.quaternion.x,
+          this.body.quaternion.y,
+          this.body.quaternion.z,
+          this.body.quaternion.w
+        ),
+        velocity: this._bodyVel.set(
+          this.body.velocity.x,
+          this.body.velocity.y,
+          this.body.velocity.z
+        ),
+        isPlayer: true,
+      })
+
+      applyToBody(result, this.body)
+      this.reorientCamera(result)
+      // The exit portal is now in front of us; seed the crossing test so we do
+      // not immediately fall back through it.
+      this._prevCentre.copy(result.position)
+      this._centre.copy(result.position)
+      this.trigger('teleport', portal)
+      moved = true
+      break
     }
 
-    teleportCamera() {
-        if (this.game.world.active === 'leftportal') {
-            this.cameraBody.position.copy(this.game.world.rightPortalPosition);
-        } else if (this.game.world.active === 'rightportal') {
-            this.cameraBody.position.copy(this.game.world.leftPortalPosition);
-        }
+    this._prevCentre.copy(this._centre)
+    return moved
+  }
+
+  /**
+   * Re-aims the camera through the link matrix.
+   *
+   * Valve's TransformAnglesToWorldSpace applies the link rotation to the whole
+   * orientation. PointerLockControls rebuilds its euler from the camera
+   * quaternion every mouse move with order YXZ and a +/-90 degree pitch clamp,
+   * so any roll we leave in would be discarded on the next frame anyway. Apply
+   * the real rotation, then keep only its yaw and pitch.
+   */
+  reorientCamera(result) {
+    const cam = this.camera.instance
+
+    this._linkQuat.setFromRotationMatrix(result.matrix)
+    this._linkQuat.multiply(cam.quaternion)
+
+    const e = this._euler.setFromQuaternion(this._linkQuat, 'YXZ')
+    e.z = 0
+    e.x = Math.max(-HALF_PI + 0.01, Math.min(HALF_PI - 0.01, e.x))
+    cam.quaternion.setFromEuler(e)
+    cam.up.set(0, 1, 0)
+  }
+
+  update(dt) {
+    if (this.pointerLocked) this.move(dt)
+    else this.wish.set(0, 0, 0)
+
+    const cam = this.camera.instance
+    cam.position.set(
+      this.body.position.x,
+      this.body.position.y + PLAYER_EYE_OFFSET,
+      this.body.position.z
+    )
+
+    // viewmodel sway
+    if (this.gunModel) {
+      const speed = Math.hypot(this.body.velocity.x, this.body.velocity.z)
+      this._gunSway += dt * (2 + speed * 1.2)
+      const bob = this.grounded ? Math.sin(this._gunSway * 2) * Math.min(speed, 8) * 0.0022 : 0
+      this.viewmodel.position.set(0, bob, 0)
     }
 
-    onKeyDown(event) {
-        this.pressedKeys[event.keyCode] = true;
-        this.updateMovementAndAnimation();
-    }
+    // fell out of the world
+    if (this.body.position.y < -12) this.respawn()
+  }
 
-    onKeyUp(event) {
-        delete this.pressedKeys[event.keyCode];
-        this.updateMovementAndAnimation();
-    }
-
-    updateMovementAndAnimation() {
-        let newVelocityX = 0;
-        let newVelocityZ = 0;
-        let newAction = 'idle';
-
-        if (87 in this.pressedKeys) { // W
-            newVelocityZ = -1;
-            newAction = 'walk';
-        }
-        if (83 in this.pressedKeys) { // S
-            newVelocityZ = 1;
-            newAction = 'back';
-        }
-        if (65 in this.pressedKeys) { // A
-            newVelocityX = -1;
-            newAction = 'right';
-        }
-        if (68 in this.pressedKeys) { // D
-            newVelocityX = 1;
-            newAction = 'left';
-        }
-        if(32 in this.pressedKeys) {
-            this.jump()
-        }
-
-        if (newVelocityX !== 0 && newVelocityZ !== 0) {
-            newVelocityX *= 0.7071; // Normalize speed when moving diagonally
-            newVelocityZ *= 0.7071;
-        }
-
-        this.velocity.x = newVelocityX;
-        this.velocity.z = newVelocityZ;
-
-        if (this.velocity.x === 0 && this.velocity.z === 0) {
-            newAction = 'idle';
-        }
-
-        this.fadeToAction(newAction, 0.2);
-    }
-
-    jump() {
-        if (!this.enabled || this.isJumping) return;
-        this.cameraBody.applyImpulse(new CANNON.Vec3(0, 20, 0), this.cameraBody.position);
-        this.isJumping = true;
-    }
-
-    onFullScreenChange() {
-        this.enabled = document.fullscreenElement === document.body;
-    }
-
-    requestPointerLock() {
-        this.controls.lock();
-    }
-
-    moveForward(distance) {
-        if (!this.enabled) return;
-
-        const verticalRotation = new THREE.Quaternion();
-        const euler = new THREE.Euler();
-        euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-        euler.x = 0;
-        euler.z = 0;
-        verticalRotation.setFromEuler(euler);
-        this.cameraBody.quaternion.copy(verticalRotation);
-
-        const forward = new CANNON.Vec3();
-        this.cameraBody.quaternion.vmult(new CANNON.Vec3(0, 0, -1), forward);
-        forward.normalize();
-
-        const newVelocity = forward.scale(distance);
-        this.cameraBody.position.vadd(newVelocity, this.cameraBody.position);
-    }
-
-    moveRight(distance) {
-        if (!this.enabled) return;
-
-        const verticalRotation = new THREE.Quaternion();
-        const euler = new THREE.Euler();
-        euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-        euler.x = 0;
-        euler.z = 0;
-        verticalRotation.setFromEuler(euler);
-        this.cameraBody.quaternion.copy(verticalRotation);
-
-        const right = new CANNON.Vec3();
-        this.cameraBody.quaternion.vmult(new CANNON.Vec3(1, 0, 0), right);
-        right.normalize();
-
-        const newVelocity = right.scale(distance);
-        this.cameraBody.position.vadd(newVelocity, this.cameraBody.position);
-    }
-
-    fadeToAction(name, duration) {
-        const previousAction = this.activeAction;
-        this.activeAction = this.actions[name];
-
-        if (previousAction !== this.activeAction) {
-            if (previousAction) {
-                previousAction.fadeOut(duration);
-            }
-            this.activeAction
-                .reset()
-                .setEffectiveTimeScale(1)
-                .setEffectiveWeight(1)
-                .fadeIn(duration)
-                .play();
-        }
-    }
-
-    update(timeElapsedS) {
-        if (this.mixer) {
-            this.mixer.update(this.game.time.delta / 1000);
-        }
-        this.moveForward(-this.velocity.z / 3);
-        this.moveRight(this.velocity.x / 3);
-        this.camera.position.copy(this.cameraBody.position);
-
-        // Synchronize gun model with the camera
-        if (this.model2) {
-            const cameraPosition = this.camera.position.clone();
-            const cameraQuaternion = this.camera.quaternion.clone();
-            const gunOffset = new THREE.Vector3(2, -1.5, -2); // Adjust the offset as needed
-
-            // Apply the camera's rotation to the offset
-            gunOffset.applyQuaternion(cameraQuaternion);
-
-            // Position the gun relative to the camera
-            this.model2.position.copy(cameraPosition).add(gunOffset);
-            this.model2.quaternion.copy(cameraQuaternion);
-        }
-
-        this.previousPosition.copy(this.camera.position);
-
-        if (this.model) {
-            let cameraPosition = this.camera.position.clone();
-            let cameraRotationY = Math.atan2(this.camera.matrix.elements[8], this.camera.matrix.elements[10]);
-            let rotationMatrix = new THREE.Matrix4().makeRotationY(cameraRotationY);
-            let relativePosition = new THREE.Vector3(2, -10, 2.5);
-            relativePosition.applyMatrix4(rotationMatrix);
-            this.model.position.copy(cameraPosition).add(relativePosition);
-            this.model.rotation.y = cameraRotationY;
-        }
-
-        if (!this.isJumping) {
-            this.cameraBody.linearDamping = 0.99
-        } else {
-            this.cameraBody.linearDamping = 0
-        }
-
-        if(this.cameraBody.velocity.y > 50){
-            this.cameraBody.velocity.y = 5
-        }
-
-        // Keep player upright
-        this.cameraBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), this.camera.rotation.y);
-    }
+  respawn() {
+    this.body.position.copy(this.spawnPoint)
+    this.body.velocity.setZero()
+    this.body.angularVelocity.setZero()
+    this.trigger('respawn')
+  }
 }

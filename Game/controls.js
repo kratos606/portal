@@ -3,6 +3,7 @@ import CANNON from 'cannon';
 import Game from './game';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import assetPath from './Utils/assetPath.js';
 
 const GROUP_DEFAULT    = 1 << 0;
 const GROUP_PLAYER     = 1 << 1;
@@ -61,7 +62,7 @@ export default class FirstPersonControl {
         this.game.world.physics.addBody(this.cameraBody);
 
         const loader = new GLTFLoader();
-        loader.load('/lara webp (1024).glb', (gltf) => {
+        loader.load(assetPath('/lara webp (1024).glb'), (gltf) => {
             this.model = gltf.scene;
             this.model.scale.set(6, 6, 6);
             this.model.rotation.y = 1;
@@ -97,7 +98,7 @@ export default class FirstPersonControl {
             this.activeAction = this.idleAction;
             this.fadeToAction('idle', 0.2);
         });
-        loader.load('/portal_gun.glb',(gltf) => {
+        loader.load(assetPath('/portal_gun.glb'),(gltf) => {
             this.model2 = gltf.scene;
             this.model2.scale.set(0.04, 0.04, 0.04);
             this.model2.traverse((child)=>{

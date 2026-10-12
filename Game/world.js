@@ -2,6 +2,7 @@ import * as THREE from "three"
 import CANNON from "cannon"
 import Game from "./game"
 import { GLTFLoader } from "three/examples/jsm/Addons.js";
+import assetPath from "./Utils/assetPath.js";
 
 class Portal {
     constructor(scene, renderer) {
@@ -452,7 +453,7 @@ export default class World {
         floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5)
         this.physics.addBody(floorBody)
 
-        const floorTexture = new THREE.TextureLoader().load('/textures/concrete_modular_floor001c.png')
+        const floorTexture = new THREE.TextureLoader().load(assetPath('/textures/concrete_modular_floor001c.png'))
         floorTexture.repeat.set(4, 4)
         floorTexture.wrapS = THREE.RepeatWrapping
         floorTexture.wrapT = THREE.RepeatWrapping
@@ -477,7 +478,7 @@ export default class World {
         const wallShape = new CANNON.Box(new CANNON.Vec3(100, 50, 1))
 
         const createWall = (width, height, depth, color, position, rotation, group) => {
-            const wallTexture = new THREE.TextureLoader().load('/textures/concrete_modular_wall001a.png')
+            const wallTexture = new THREE.TextureLoader().load(assetPath('/textures/concrete_modular_wall001a.png'))
             wallTexture.repeat.set(4, 3)
             wallTexture.wrapS = THREE.RepeatWrapping
             wallTexture.wrapT = THREE.RepeatWrapping
@@ -525,7 +526,7 @@ export default class World {
         let rightWallMesh = createWall(200, wallHeight, 1, 0xffff0f, { x: 100, y: wallYPosition, z: 0 }, { x: 0, y: -Math.PI / 2, z: 0 }, GROUP_WALL_RIGHT)
         rightWallMesh.name = 'rightWall'
 
-        const roofTexture = new THREE.TextureLoader().load('/textures/concrete_modular_ceiling001a.png')
+        const roofTexture = new THREE.TextureLoader().load(assetPath('/textures/concrete_modular_ceiling001a.png'))
         roofTexture.repeat.set(4, 4)
         roofTexture.wrapS = THREE.RepeatWrapping
         roofTexture.wrapT = THREE.RepeatWrapping
@@ -946,7 +947,7 @@ export default class World {
     createCompanionCube() {
         const loader = new GLTFLoader()
 
-        loader.load('/cube.glb', (gltf) => {
+        loader.load(assetPath('/cube.glb'), (gltf) => {
             this.companionCube = gltf.scene
 
             const box = new THREE.Box3().setFromObject(this.companionCube)

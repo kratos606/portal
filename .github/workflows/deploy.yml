@@ -1,0 +1,38 @@
+name: Deploy to GitHub Pages
+# Every push to `main` builds the Vite app and publishes ./dist to `gh-pages`.
+# Pages itself stays configured as "Deploy from a branch -> gh-pages / root",
+# so GitHub's own `pages build and deployment` workflow picks it up from there.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+# Never let two deploys race; the newest one just queues behind the current one.
+concurrency:
+  group: deploy-gh-pages
+  cancel-in-progress: false
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Publish ./dist to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "Deploy ${{ github.sha }} to GitHub Pages"

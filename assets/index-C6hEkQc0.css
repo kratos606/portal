@@ -1,0 +1,1 @@
+*{margin:0;padding:0;box-sizing:border-box}html,body{overflow:hidden}.webgl{position:fixed;width:100vw;height:100vh}.dot{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100000;pointer-events:none}.blue{stroke:#00f;stroke-width:1px;fill:none}.orange{stroke:orange;stroke-width:1px;fill:none}.blue.active{fill:#00f}.orange.active{fill:orange}
